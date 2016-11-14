@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="us-ascii"?>
+
+<fileSet version="1" anchorPath="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp" xsi:schemaLocation="http://cypress.com/xsd/cypathdictionary cypathdictionary.xsd" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns="http://cypress.com/xsd/cypathdictionary">
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cyfitter_cfg.h" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cyfitter_cfg.c" value="DP8051_C_FILE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\config.hex" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\protect.hex" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\eeprom.hex" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cydevice.h" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cydevicekeil.inc" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cydevice_trm.h" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cydevicekeil_trm.inc" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cyfitterkeil.inc" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cyfitter.h" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cydisabledsheets.h" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\LCD_Char.c" value="DP8051_C_FILE;LCD_Char" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\LCD_Char.h" value="NONE;LCD_Char" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\LCD_Char_PM.c" value="DP8051_C_FILE;LCD_Char" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\SDA.c" value="DP8051_C_FILE;SDA" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\SDA.h" value="NONE;SDA" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\SDA_aliases.h" value="NONE;SDA" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\SCL.c" value="DP8051_C_FILE;SCL" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\SCL.h" value="NONE;SCL" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\SCL_aliases.h" value="NONE;SCL" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS.c" value="DP8051_C_FILE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS.h" value="NONE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS_BOOT.c" value="DP8051_C_FILE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS_INT.c" value="DP8051_C_FILE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS_PM.c" value="DP8051_C_FILE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS_SLAVE.c" value="DP8051_C_FILE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS_MASTER.c" value="DP8051_C_FILE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\I2CS_PVT.h" value="NONE;I2CS" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\LCD_Char_LCDPort.c" value="DP8051_C_FILE;LCD_Char_LCDPort" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\LCD_Char_LCDPort.h" value="NONE;LCD_Char_LCDPort" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\LCD_Char_LCDPort_aliases.h" value="NONE;LCD_Char_LCDPort" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cycodeshareimport.ld" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cycodeshareimport.scat" value="NONE;" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CyBootAsmKeil.a51" value="KEIL_8051_ASM_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CyDmac.c" value="DP8051_C_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CyDmac.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CyFlash.c" value="DP8051_C_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CyFlash.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CyLib.c" value="DP8051_C_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CyLib.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cymem.a51" value="KEIL_8051_ASM_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cypins.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cyPm.c" value="DP8051_C_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cyPm.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CySpc.c" value="DP8051_C_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\CySpc.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cytypes.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\cyutils.c" value="DP8051_C_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\KeilStart.a51" value="KEIL_8051_ASM_FILE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\PSoC3_8051.h" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\PSoC3_8051.inc" value="NONE;cy_boot" />
+  <file name="D:\robot\code\robot_T\Workspace01\DelSig_I2CM_Test01.cydsn\codegentemp\project.h" value="NONE;" />
+</fileSet>

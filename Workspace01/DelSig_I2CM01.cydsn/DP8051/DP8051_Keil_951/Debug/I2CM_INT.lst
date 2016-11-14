@@ -1,0 +1,1316 @@
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE I2CM_INT
+OBJECT MODULE PLACED IN .\DP8051\DP8051_Keil_951\Debug\I2CM_INT.obj
+COMPILER INVOKED BY: C:\Program Files (x86)\Cypress\PSoC Creator\3.3\PSoC Creator\import\keil\pk51\9.51\C51\BIN\c51.exe 
+                    -.\Generated_Source\PSoC3\I2CM_INT.c NOIV LARGE MODDP2 OMF2 VB(1) NOIP INCDIR(.,Generated_Source\PSoC3) FF(3) DB WL(2) PR
+                    -(.\DP8051\DP8051_Keil_951\Debug/I2CM_INT.lst) CD OT(2,SIZE) OJ(.\DP8051\DP8051_Keil_951\Debug\I2CM_INT.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2          * File Name: I2CM_INT.c
+   3          * Version 3.50
+   4          *
+   5          * Description:
+   6          *  This file provides the source code of Interrupt Service Routine (ISR)
+   7          *  for the I2C component.
+   8          *
+   9          ********************************************************************************
+  10          * Copyright 2008-2015, Cypress Semiconductor Corporation. All rights reserved.
+  11          * You may use this file only in accordance with the license, terms, conditions,
+  12          * disclaimers, and limitations in the end user license agreement accompanying
+  13          * the software package with which this file was provided.
+  14          *******************************************************************************/
+  15          
+  16          #include "I2CM_PVT.h"
+  17          #include "cyapicallbacks.h"
+  18          
+  19          
+  20          /*******************************************************************************
+  21          *  Place your includes, defines and code here.
+  22          ********************************************************************************/
+  23          /* `#START I2CM_ISR_intc` */
+  24          
+  25          /* `#END` */
+  26          
+  27          
+  28          /*******************************************************************************
+  29          * Function Name: I2CM_ISR
+  30          ********************************************************************************
+  31          *
+  32          * Summary:
+  33          *  The handler for the I2C interrupt. The slave and master operations are
+  34          *  handled here.
+  35          *
+  36          * Parameters:
+  37          *  None.
+  38          *
+  39          * Return:
+  40          *  None.
+  41          *
+  42          * Reentrant:
+  43          *  No.
+  44          *
+  45          *******************************************************************************/
+  46          CY_ISR(I2CM_ISR)
+  47          {
+  48   1      #if (I2CM_MODE_SLAVE_ENABLED)
+                 uint8  tmp8;
+              #endif  /* (I2CM_MODE_SLAVE_ENABLED) */
+  51   1      
+  52   1          uint8  tmpCsr;
+  53   1          
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 2   
+
+  54   1      #ifdef I2CM_ISR_ENTRY_CALLBACK
+                  I2CM_ISR_EntryCallback();
+              #endif /* I2CM_ISR_ENTRY_CALLBACK */
+  57   1          
+  58   1      
+  59   1      #if(I2CM_TIMEOUT_FF_ENABLED)
+                  if(0u != I2CM_TimeoutGetStatus())
+                  {
+                      I2CM_TimeoutReset();
+                      I2CM_state = I2CM_SM_EXIT_IDLE;
+                      /* I2CM_CSR_REG should be cleared after reset */
+                  }
+              #endif /* (I2CM_TIMEOUT_FF_ENABLED) */
+  67   1      
+  68   1      
+  69   1          tmpCsr = I2CM_CSR_REG;      /* Make copy as interrupts clear */
+  70   1      
+  71   1      #if(I2CM_MODE_MULTI_MASTER_SLAVE_ENABLED)
+                  if(I2CM_CHECK_START_GEN(I2CM_MCSR_REG))
+                  {
+                      I2CM_CLEAR_START_GEN;
+              
+                      /* Set transfer complete and error flags */
+                      I2CM_mstrStatus |= (I2CM_MSTAT_ERR_XFER |
+                                                      I2CM_GET_MSTAT_CMPLT);
+              
+                      /* Slave was addressed */
+                      I2CM_state = I2CM_SM_SLAVE;
+                  }
+              #endif /* (I2CM_MODE_MULTI_MASTER_SLAVE_ENABLED) */
+  84   1      
+  85   1      
+  86   1      #if(I2CM_MODE_MULTI_MASTER_ENABLED)
+                  if(I2CM_CHECK_LOST_ARB(tmpCsr))
+                  {
+                      /* Set errors */
+                      I2CM_mstrStatus |= (I2CM_MSTAT_ERR_XFER     |
+                                                      I2CM_MSTAT_ERR_ARB_LOST |
+                                                      I2CM_GET_MSTAT_CMPLT);
+              
+                      I2CM_DISABLE_INT_ON_STOP; /* Interrupt on Stop is enabled by write */
+              
+                      #if(I2CM_MODE_MULTI_MASTER_SLAVE_ENABLED)
+                          if(I2CM_CHECK_ADDRESS_STS(tmpCsr))
+                          {
+                              /* Slave was addressed */
+                              I2CM_state = I2CM_SM_SLAVE;
+                          }
+                          else
+                          {
+                              I2CM_BUS_RELEASE;
+              
+                              I2CM_state = I2CM_SM_EXIT_IDLE;
+                          }
+                      #else
+                          I2CM_BUS_RELEASE;
+              
+                          I2CM_state = I2CM_SM_EXIT_IDLE;
+              
+                      #endif /* (I2CM_MODE_MULTI_MASTER_SLAVE_ENABLED) */
+                  }
+              #endif /* (I2CM_MODE_MULTI_MASTER_ENABLED) */
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 3   
+
+ 116   1      
+ 117   1          /* Check for master operation mode */
+ 118   1          if(I2CM_CHECK_SM_MASTER)
+ 119   1          {
+ 120   2          #if(I2CM_MODE_MASTER_ENABLED)
+ 121   2              if(I2CM_CHECK_BYTE_COMPLETE(tmpCsr))
+ 122   2              {
+ 123   3                  switch (I2CM_state)
+ 124   3                  {
+ 125   4                  case I2CM_SM_MSTR_WR_ADDR:  /* After address is sent, write data */
+ 126   4                  case I2CM_SM_MSTR_RD_ADDR:  /* After address is sent, read data */
+ 127   4      
+ 128   4                      tmpCsr &= ((uint8) ~I2CM_CSR_STOP_STATUS); /* Clear Stop bit history on address phase */
+ 129   4      
+ 130   4                      if(I2CM_CHECK_ADDR_ACK(tmpCsr))
+ 131   4                      {
+ 132   5                          /* Setup for transmit or receive of data */
+ 133   5                          if(I2CM_state == I2CM_SM_MSTR_WR_ADDR)   /* TRANSMIT data */
+ 134   5                          {
+ 135   6                              /* Check if at least one byte to transfer */
+ 136   6                              if(I2CM_mstrWrBufSize > 0u)
+ 137   6                              {
+ 138   7                                  /* Load the 1st data byte */
+ 139   7                                  I2CM_DATA_REG = I2CM_mstrWrBufPtr[0u];
+ 140   7                                  I2CM_TRANSMIT_DATA;
+ 141   7                                  I2CM_mstrWrBufIndex = 1u;   /* Set index to 2nd element */
+ 142   7      
+ 143   7                                  /* Set transmit state until done */
+ 144   7                                  I2CM_state = I2CM_SM_MSTR_WR_DATA;
+ 145   7                              }
+ 146   6                              /* End of buffer: complete writing */
+ 147   6                              else if(I2CM_CHECK_NO_STOP(I2CM_mstrControl))
+ 148   6                              {
+ 149   7                                  /* Set write complete and master halted */
+ 150   7                                  I2CM_mstrStatus |= (I2CM_MSTAT_XFER_HALT |
+ 151   7                                                                  I2CM_MSTAT_WR_CMPLT);
+ 152   7      
+ 153   7                                  I2CM_state = I2CM_SM_MSTR_HALT; /* Expect ReStart */
+ 154   7                                  I2CM_DisableInt();
+ 155   7                              }
+ 156   6                              else
+ 157   6                              {
+ 158   7                                  I2CM_ENABLE_INT_ON_STOP; /* Enable interrupt on Stop, to catch it */
+ 159   7                                  I2CM_GENERATE_STOP;
+ 160   7                              }
+ 161   6                          }
+ 162   5                          else  /* Master receive data */
+ 163   5                          {
+ 164   6                              I2CM_READY_TO_READ; /* Release bus to read data */
+ 165   6      
+ 166   6                              I2CM_state  = I2CM_SM_MSTR_RD_DATA;
+ 167   6                          }
+ 168   5                      }
+ 169   4                      /* Address is NACKed */
+ 170   4                      else if(I2CM_CHECK_ADDR_NAK(tmpCsr))
+ 171   4                      {
+ 172   5                          /* Set Address NAK error */
+ 173   5                          I2CM_mstrStatus |= (I2CM_MSTAT_ERR_XFER |
+ 174   5                                                          I2CM_MSTAT_ERR_ADDR_NAK);
+ 175   5      
+ 176   5                          if(I2CM_CHECK_NO_STOP(I2CM_mstrControl))
+ 177   5                          {
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 4   
+
+ 178   6                              I2CM_mstrStatus |= (I2CM_MSTAT_XFER_HALT |
+ 179   6                                                              I2CM_GET_MSTAT_CMPLT);
+ 180   6      
+ 181   6                              I2CM_state = I2CM_SM_MSTR_HALT; /* Expect RESTART */
+ 182   6                              I2CM_DisableInt();
+ 183   6                          }
+ 184   5                          else  /* Do normal Stop */
+ 185   5                          {
+ 186   6                              I2CM_ENABLE_INT_ON_STOP; /* Enable interrupt on Stop, to catch it */
+ 187   6                              I2CM_GENERATE_STOP;
+ 188   6                          }
+ 189   5                      }
+ 190   4                      else
+ 191   4                      {
+ 192   5                          /* Address phase is not set for some reason: error */
+ 193   5                          #if(I2CM_TIMEOUT_ENABLED)
+                                      /* Exit interrupt to take chance for timeout timer to handle this case */
+                                      I2CM_DisableInt();
+                                      I2CM_ClearPendingInt();
+                                  #else
+ 198   5                              /* Block execution flow: unexpected condition */
+ 199   5                              CYASSERT(0u != 0u);
+ 200   5                          #endif /* (I2CM_TIMEOUT_ENABLED) */
+ 201   5                      }
+ 202   4                      break;
+ 203   4      
+ 204   4                  case I2CM_SM_MSTR_WR_DATA:
+ 205   4      
+ 206   4                      if(I2CM_CHECK_DATA_ACK(tmpCsr))
+ 207   4                      {
+ 208   5                          /* Check if end of buffer */
+ 209   5                          if(I2CM_mstrWrBufIndex  < I2CM_mstrWrBufSize)
+ 210   5                          {
+ 211   6                              I2CM_DATA_REG =
+ 212   6                                                       I2CM_mstrWrBufPtr[I2CM_mstrWrBufIndex];
+ 213   6                              I2CM_TRANSMIT_DATA;
+ 214   6                              I2CM_mstrWrBufIndex++;
+ 215   6                          }
+ 216   5                          /* End of buffer: complete writing */
+ 217   5                          else if(I2CM_CHECK_NO_STOP(I2CM_mstrControl))
+ 218   5                          {
+ 219   6                              /* Set write complete and master halted */
+ 220   6                              I2CM_mstrStatus |= (I2CM_MSTAT_XFER_HALT |
+ 221   6                                                              I2CM_MSTAT_WR_CMPLT);
+ 222   6      
+ 223   6                              I2CM_state = I2CM_SM_MSTR_HALT;    /* Expect restart */
+ 224   6                              I2CM_DisableInt();
+ 225   6                          }
+ 226   5                          else  /* Do normal Stop */
+ 227   5                          {
+ 228   6                              I2CM_ENABLE_INT_ON_STOP;    /* Enable interrupt on Stop, to catch it */
+ 229   6                              I2CM_GENERATE_STOP;
+ 230   6                          }
+ 231   5                      }
+ 232   4                      /* Last byte NAKed: end writing */
+ 233   4                      else if(I2CM_CHECK_NO_STOP(I2CM_mstrControl))
+ 234   4                      {
+ 235   5                          /* Set write complete, short transfer and master halted */
+ 236   5                          I2CM_mstrStatus |= (I2CM_MSTAT_ERR_XFER       |
+ 237   5                                                          I2CM_MSTAT_ERR_SHORT_XFER |
+ 238   5                                                          I2CM_MSTAT_XFER_HALT      |
+ 239   5                                                          I2CM_MSTAT_WR_CMPLT);
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 5   
+
+ 240   5      
+ 241   5                          I2CM_state = I2CM_SM_MSTR_HALT;    /* Expect ReStart */
+ 242   5                          I2CM_DisableInt();
+ 243   5                      }
+ 244   4                      else  /* Do normal Stop */
+ 245   4                      {
+ 246   5                          I2CM_ENABLE_INT_ON_STOP;    /* Enable interrupt on Stop, to catch it */
+ 247   5                          I2CM_GENERATE_STOP;
+ 248   5      
+ 249   5                          /* Set short transfer and error flag */
+ 250   5                          I2CM_mstrStatus |= (I2CM_MSTAT_ERR_SHORT_XFER |
+ 251   5                                                          I2CM_MSTAT_ERR_XFER);
+ 252   5                      }
+ 253   4      
+ 254   4                      break;
+ 255   4      
+ 256   4                  case I2CM_SM_MSTR_RD_DATA:
+ 257   4      
+ 258   4                      I2CM_mstrRdBufPtr[I2CM_mstrRdBufIndex] = I2CM_DATA_REG;
+ 259   4                      I2CM_mstrRdBufIndex++;
+ 260   4      
+ 261   4                      /* Check if end of buffer */
+ 262   4                      if(I2CM_mstrRdBufIndex < I2CM_mstrRdBufSize)
+ 263   4                      {
+ 264   5                          I2CM_ACK_AND_RECEIVE;       /* ACK and receive byte */
+ 265   5                      }
+ 266   4                      /* End of buffer: complete reading */
+ 267   4                      else if(I2CM_CHECK_NO_STOP(I2CM_mstrControl))
+ 268   4                      {
+ 269   5                          /* Set read complete and master halted */
+ 270   5                          I2CM_mstrStatus |= (I2CM_MSTAT_XFER_HALT |
+ 271   5                                                          I2CM_MSTAT_RD_CMPLT);
+ 272   5      
+ 273   5                          I2CM_state = I2CM_SM_MSTR_HALT;    /* Expect ReStart */
+ 274   5                          I2CM_DisableInt();
+ 275   5                      }
+ 276   4                      else
+ 277   4                      {
+ 278   5                          I2CM_ENABLE_INT_ON_STOP;
+ 279   5                          I2CM_NAK_AND_RECEIVE;       /* NACK and TRY to generate Stop */
+ 280   5                      }
+ 281   4                      break;
+ 282   4      
+ 283   4                  default: /* This is an invalid state and should not occur */
+ 284   4      
+ 285   4                  #if(I2CM_TIMEOUT_ENABLED)
+                              /* Exit interrupt to take chance for timeout timer to handles this case */
+                              I2CM_DisableInt();
+                              I2CM_ClearPendingInt();
+                          #else
+ 290   4                      /* Block execution flow: unexpected condition */
+ 291   4                      CYASSERT(0u != 0u);
+ 292   4                  #endif /* (I2CM_TIMEOUT_ENABLED) */
+ 293   4      
+ 294   4                      break;
+ 295   4                  }
+ 296   3              }
+ 297   2      
+ 298   2              /* Catches Stop: end of transaction */
+ 299   2              if(I2CM_CHECK_STOP_STS(tmpCsr))
+ 300   2              {
+ 301   3                  I2CM_mstrStatus |= I2CM_GET_MSTAT_CMPLT;
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 6   
+
+ 302   3      
+ 303   3                  I2CM_DISABLE_INT_ON_STOP;
+ 304   3                  I2CM_state = I2CM_SM_IDLE;
+ 305   3              }
+ 306   2          #endif /* (I2CM_MODE_MASTER_ENABLED) */
+ 307   2          }
+ 308   1          else if(I2CM_CHECK_SM_SLAVE)
+ 309   1          {
+ 310   2          #if(I2CM_MODE_SLAVE_ENABLED)
+              
+                      if((I2CM_CHECK_STOP_STS(tmpCsr)) || /* Stop || Restart */
+                         (I2CM_CHECK_BYTE_COMPLETE(tmpCsr) && I2CM_CHECK_ADDRESS_STS(tmpCsr)))
+                      {
+                          /* Catch end of master write transaction: use interrupt on Stop */
+                          /* The Stop bit history on address phase does not have correct state */
+                          if(I2CM_SM_SL_WR_DATA == I2CM_state)
+                          {
+                              I2CM_DISABLE_INT_ON_STOP;
+              
+                              I2CM_slStatus &= ((uint8) ~I2CM_SSTAT_WR_BUSY);
+                              I2CM_slStatus |= ((uint8)  I2CM_SSTAT_WR_CMPLT);
+              
+                              I2CM_state = I2CM_SM_IDLE;
+                          }
+                      }
+              
+                      if(I2CM_CHECK_BYTE_COMPLETE(tmpCsr))
+                      {
+                          /* The address only issued after Start or ReStart: so check the address
+                             to catch these events:
+                              FF : sets an address phase with a byte_complete interrupt trigger.
+                              UDB: sets an address phase immediately after Start or ReStart. */
+                          if(I2CM_CHECK_ADDRESS_STS(tmpCsr))
+                          {
+                          /* Check for software address detection */
+                          #if(I2CM_SW_ADRR_DECODE)
+                              tmp8 = I2CM_GET_SLAVE_ADDR(I2CM_DATA_REG);
+              
+                              if(tmp8 == I2CM_slAddress)   /* Check for address match */
+                              {
+                                  if(0u != (I2CM_DATA_REG & I2CM_READ_FLAG))
+                                  {
+                                      /* Place code to prepare read buffer here                  */
+                                      /* `#START I2CM_SW_PREPARE_READ_BUF_interrupt` */
+              
+                                      /* `#END` */
+              
+                                  #ifdef I2CM_SW_PREPARE_READ_BUF_CALLBACK
+                                      I2CM_SwPrepareReadBuf_Callback();
+                                  #endif /* I2CM_SW_PREPARE_READ_BUF_CALLBACK */
+                                      
+                                      /* Prepare next operation to read, get data and place in data register */
+                                      if(I2CM_slRdBufIndex < I2CM_slRdBufSize)
+                                      {
+                                          /* Load first data byte from array */
+                                          I2CM_DATA_REG = I2CM_slRdBufPtr[I2CM_slRdBufIndex];
+                                          I2CM_ACK_AND_TRANSMIT;
+                                          I2CM_slRdBufIndex++;
+              
+                                          I2CM_slStatus |= I2CM_SSTAT_RD_BUSY;
+                                      }
+                                      else    /* Overflow: provide 0xFF on bus */
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 7   
+
+                                      {
+                                          I2CM_DATA_REG = I2CM_OVERFLOW_RETURN;
+                                          I2CM_ACK_AND_TRANSMIT;
+              
+                                          I2CM_slStatus  |= (I2CM_SSTAT_RD_BUSY |
+                                                                         I2CM_SSTAT_RD_ERR_OVFL);
+                                      }
+              
+                                      I2CM_state = I2CM_SM_SL_RD_DATA;
+                                  }
+                                  else  /* Write transaction: receive 1st byte */
+                                  {
+                                      I2CM_ACK_AND_RECEIVE;
+                                      I2CM_state = I2CM_SM_SL_WR_DATA;
+              
+                                      I2CM_slStatus |= I2CM_SSTAT_WR_BUSY;
+                                      I2CM_ENABLE_INT_ON_STOP;
+                                  }
+                              }
+                              else
+                              {
+                                  /*     Place code to compare for additional address here    */
+                                  /* `#START I2CM_SW_ADDR_COMPARE_interruptStart` */
+              
+                                  /* `#END` */
+              
+                              #ifdef I2CM_SW_ADDR_COMPARE_ENTRY_CALLBACK
+                                  I2CM_SwAddrCompare_EntryCallback();
+                              #endif /* I2CM_SW_ADDR_COMPARE_ENTRY_CALLBACK */
+                                  
+                                  I2CM_NAK_AND_RECEIVE;   /* NACK address */
+              
+                                  /* Place code to end of condition for NACK generation here */
+                                  /* `#START I2CM_SW_ADDR_COMPARE_interruptEnd`  */
+              
+                                  /* `#END` */
+              
+                              #ifdef I2CM_SW_ADDR_COMPARE_EXIT_CALLBACK
+                                  I2CM_SwAddrCompare_ExitCallback();
+                              #endif /* I2CM_SW_ADDR_COMPARE_EXIT_CALLBACK */
+                              }
+              
+                          #else /* (I2CM_HW_ADRR_DECODE) */
+              
+                              if(0u != (I2CM_DATA_REG & I2CM_READ_FLAG))
+                              {
+                                  /* Place code to prepare read buffer here                  */
+                                  /* `#START I2CM_HW_PREPARE_READ_BUF_interrupt` */
+              
+                                  /* `#END` */
+                                  
+                              #ifdef I2CM_HW_PREPARE_READ_BUF_CALLBACK
+                                  I2CM_HwPrepareReadBuf_Callback();
+                              #endif /* I2CM_HW_PREPARE_READ_BUF_CALLBACK */
+              
+                                  /* Prepare next operation to read, get data and place in data register */
+                                  if(I2CM_slRdBufIndex < I2CM_slRdBufSize)
+                                  {
+                                      /* Load first data byte from array */
+                                      I2CM_DATA_REG = I2CM_slRdBufPtr[I2CM_slRdBufIndex];
+                                      I2CM_ACK_AND_TRANSMIT;
+                                      I2CM_slRdBufIndex++;
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 8   
+
+              
+                                      I2CM_slStatus |= I2CM_SSTAT_RD_BUSY;
+                                  }
+                                  else    /* Overflow: provide 0xFF on bus */
+                                  {
+                                      I2CM_DATA_REG = I2CM_OVERFLOW_RETURN;
+                                      I2CM_ACK_AND_TRANSMIT;
+              
+                                      I2CM_slStatus  |= (I2CM_SSTAT_RD_BUSY |
+                                                                     I2CM_SSTAT_RD_ERR_OVFL);
+                                  }
+              
+                                  I2CM_state = I2CM_SM_SL_RD_DATA;
+                              }
+                              else  /* Write transaction: receive 1st byte */
+                              {
+                                  I2CM_ACK_AND_RECEIVE;
+                                  I2CM_state = I2CM_SM_SL_WR_DATA;
+              
+                                  I2CM_slStatus |= I2CM_SSTAT_WR_BUSY;
+                                  I2CM_ENABLE_INT_ON_STOP;
+                              }
+              
+                          #endif /* (I2CM_SW_ADRR_DECODE) */
+                          }
+                          /* Data states */
+                          /* Data master writes into slave */
+                          else if(I2CM_state == I2CM_SM_SL_WR_DATA)
+                          {
+                              if(I2CM_slWrBufIndex < I2CM_slWrBufSize)
+                              {
+                                  tmp8 = I2CM_DATA_REG;
+                                  I2CM_ACK_AND_RECEIVE;
+                                  I2CM_slWrBufPtr[I2CM_slWrBufIndex] = tmp8;
+                                  I2CM_slWrBufIndex++;
+                              }
+                              else  /* of array: complete write, send NACK */
+                              {
+                                  I2CM_NAK_AND_RECEIVE;
+              
+                                  I2CM_slStatus |= I2CM_SSTAT_WR_ERR_OVFL;
+                              }
+                          }
+                          /* Data master reads from slave */
+                          else if(I2CM_state == I2CM_SM_SL_RD_DATA)
+                          {
+                              if(I2CM_CHECK_DATA_ACK(tmpCsr))
+                              {
+                                  if(I2CM_slRdBufIndex < I2CM_slRdBufSize)
+                                  {
+                                       /* Get data from array */
+                                      I2CM_DATA_REG = I2CM_slRdBufPtr[I2CM_slRdBufIndex];
+                                      I2CM_TRANSMIT_DATA;
+                                      I2CM_slRdBufIndex++;
+                                  }
+                                  else   /* Overflow: provide 0xFF on bus */
+                                  {
+                                      I2CM_DATA_REG = I2CM_OVERFLOW_RETURN;
+                                      I2CM_TRANSMIT_DATA;
+              
+                                      I2CM_slStatus |= I2CM_SSTAT_RD_ERR_OVFL;
+                                  }
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 9   
+
+                              }
+                              else  /* Last byte was NACKed: read complete */
+                              {
+                                  /* Only NACK appears on bus */
+                                  I2CM_DATA_REG = I2CM_OVERFLOW_RETURN;
+                                  I2CM_NAK_AND_TRANSMIT;
+              
+                                  I2CM_slStatus &= ((uint8) ~I2CM_SSTAT_RD_BUSY);
+                                  I2CM_slStatus |= ((uint8)  I2CM_SSTAT_RD_CMPLT);
+              
+                                  I2CM_state = I2CM_SM_IDLE;
+                              }
+                          }
+                          else
+                          {
+                          #if(I2CM_TIMEOUT_ENABLED)
+                              /* Exit interrupt to take chance for timeout timer to handle this case */
+                              I2CM_DisableInt();
+                              I2CM_ClearPendingInt();
+                          #else
+                              /* Block execution flow: unexpected condition */
+                              CYASSERT(0u != 0u);
+                          #endif /* (I2CM_TIMEOUT_ENABLED) */
+                          }
+                      }
+                  #endif /* (I2CM_MODE_SLAVE_ENABLED) */
+ 514   2          }
+ 515   1          else
+ 516   1          {
+ 517   2              /* The FSM skips master and slave processing: return to IDLE */
+ 518   2              I2CM_state = I2CM_SM_IDLE;
+ 519   2          }
+ 520   1      
+ 521   1      #ifdef I2CM_ISR_EXIT_CALLBACK
+                  I2CM_ISR_ExitCallback();
+              #endif /* I2CM_ISR_EXIT_CALLBACK */    
+ 524   1      }
+ 525          
+ 526          
+ 527          #if ((I2CM_FF_IMPLEMENTED) && (I2CM_WAKEUP_ENABLED))
+                  /*******************************************************************************
+                  * Function Name: I2CM_WAKEUP_ISR
+                  ********************************************************************************
+                  *
+                  * Summary:
+                  *  The interrupt handler to trigger after a wakeup.
+                  *
+                  * Parameters:
+                  *  None.
+                  *
+                  * Return:
+                  *  None.
+                  *
+                  *******************************************************************************/
+                  CY_ISR(I2CM_WAKEUP_ISR)
+                  {
+                  #ifdef I2CM_WAKEUP_ISR_ENTRY_CALLBACK
+                      I2CM_WAKEUP_ISR_EntryCallback();
+                  #endif /* I2CM_WAKEUP_ISR_ENTRY_CALLBACK */
+                       
+                      /* Set flag to notify that matched address is received */
+                      I2CM_wakeupSource = 1u;
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 10  
+
+              
+                      /* SCL is stretched until the I2C_Wake() is called */
+              
+                  #ifdef I2CM_WAKEUP_ISR_EXIT_CALLBACK
+                      I2CM_WAKEUP_ISR_ExitCallback();
+                  #endif /* I2CM_WAKEUP_ISR_EXIT_CALLBACK */
+                  }
+              #endif /* ((I2CM_FF_IMPLEMENTED) && (I2CM_WAKEUP_ENABLED)) */
+ 558          
+ 559          
+ 560          /* [] END OF FILE */
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 11  
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION I2CM_ISR (BEGIN)
+0000 C0E0              PUSH    ACC
+0002 C0F0              PUSH    B
+0004 C083              PUSH    DPH
+0006 C082              PUSH    DPL
+0008 C085              PUSH    DPH1
+000A C084              PUSH    DPL1
+000C C086              PUSH    DPS
+000E 758600            MOV     DPS,#00H
+0011 C000        E     PUSH    ?C?XPAGE1SFR
+0013 750000      E     MOV     ?C?XPAGE1SFR,#?C?XPAGE1RST
+0016 C0D0              PUSH    PSW
+0018 75D000            MOV     PSW,#00H
+001B C000              PUSH    AR0
+001D C001              PUSH    AR1
+001F C002              PUSH    AR2
+0021 C003              PUSH    AR3
+0023 C004              PUSH    AR4
+0025 C005              PUSH    AR5
+0027 C006              PUSH    AR6
+0029 C007              PUSH    AR7
+                                           ; SOURCE LINE # 46
+                                           ; SOURCE LINE # 69
+002B 9049D7            MOV     DPTR,#049D7H
+002E E0                MOVX    A,@DPTR
+002F FF                MOV     R7,A
+0030 900000      R     MOV     DPTR,#tmpCsr
+0033 EF                MOV     A,R7
+0034 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 118
+0035 900000      E     MOV     DPTR,#I2CM_state
+0038 E0                MOVX    A,@DPTR
+0039 FF                MOV     R7,A
+003A EF                MOV     A,R7
+003B 5440              ANL     A,#040H
+003D FF                MOV     R7,A
+003E 7E00              MOV     R6,#00H
+0040 EF                MOV     A,R7
+0041 4E                ORL     A,R6
+0042 7003              JNZ     $ + 5H
+0044 020000      R     LJMP    ?C0001
+                                           ; SOURCE LINE # 119
+                                           ; SOURCE LINE # 121
+0047 900000      R     MOV     DPTR,#tmpCsr
+004A E0                MOVX    A,@DPTR
+004B FF                MOV     R7,A
+004C EF                MOV     A,R7
+004D 5401              ANL     A,#01H
+004F FF                MOV     R7,A
+0050 7E00              MOV     R6,#00H
+0052 EF                MOV     A,R7
+0053 4E                ORL     A,R6
+0054 7003              JNZ     $ + 5H
+0056 020000      R     LJMP    ?C0002
+                                           ; SOURCE LINE # 122
+                                           ; SOURCE LINE # 123
+0059 900000      E     MOV     DPTR,#I2CM_state
+005C E0                MOVX    A,@DPTR
+005D FF                MOV     R7,A
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 12  
+
+005E EF                MOV     A,R7
+005F 120000      E     LCALL   ?C?CCASE
+0062 0000        R     DW      ?C0005
+0064 45                DB      045H
+0065 0000        R     DW      ?C0039
+0067 46                DB      046H
+0068 0000        R     DW      ?C0005
+006A 49                DB      049H
+006B 0000        R     DW      ?C0063
+006D 4A                DB      04AH
+006E 0000              DW      00H
+0070 0000        R     DW      ?C0077
+                                           ; SOURCE LINE # 124
+                                           ; SOURCE LINE # 125
+                                           ; SOURCE LINE # 126
+0072         ?C0005:
+                                           ; SOURCE LINE # 128
+0072 900000      R     MOV     DPTR,#tmpCsr
+0075 E0                MOVX    A,@DPTR
+0076 FF                MOV     R7,A
+0077 EF                MOV     A,R7
+0078 54DF              ANL     A,#0DFH
+007A FF                MOV     R7,A
+007B 900000      R     MOV     DPTR,#tmpCsr
+007E EF                MOV     A,R7
+007F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 130
+0080 900000      R     MOV     DPTR,#tmpCsr
+0083 E0                MOVX    A,@DPTR
+0084 FF                MOV     R7,A
+0085 EF                MOV     A,R7
+0086 540A              ANL     A,#0AH
+0088 FF                MOV     R7,A
+0089 7E00              MOV     R6,#00H
+008B EF                MOV     A,R7
+008C 6408              XRL     A,#08H
+008E 4E                ORL     A,R6
+008F 6003              JZ      $ + 5H
+0091 020000      R     LJMP    ?C0006
+                                           ; SOURCE LINE # 131
+                                           ; SOURCE LINE # 133
+0094 900000      E     MOV     DPTR,#I2CM_state
+0097 E0                MOVX    A,@DPTR
+0098 FF                MOV     R7,A
+0099 EF                MOV     A,R7
+009A 6445              XRL     A,#045H
+009C 7075              JNZ     ?C0024
+                                           ; SOURCE LINE # 134
+                                           ; SOURCE LINE # 136
+009E 900000      E     MOV     DPTR,#I2CM_mstrWrBufSize
+00A1 E0                MOVX    A,@DPTR
+00A2 FF                MOV     R7,A
+00A3 EF                MOV     A,R7
+00A4 D3                SETB    C
+00A5 9400              SUBB    A,#00H
+00A7 4024              JC      ?C0008
+                                           ; SOURCE LINE # 137
+                                           ; SOURCE LINE # 139
+00A9 900000      E     MOV     DPTR,#I2CM_mstrWrBufPtr
+00AC 120000      E     LCALL   ?C?PLDXDATA
+00AF 120000      E     LCALL   ?C?CLDPTR
+00B2 FF                MOV     R7,A
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 13  
+
+00B3 9049D8            MOV     DPTR,#049D8H
+00B6 EF                MOV     A,R7
+00B7 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 140
+00B8 9049D7            MOV     DPTR,#049D7H
+00BB 7404              MOV     A,#04H
+00BD F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 141
+00BE 900000      E     MOV     DPTR,#I2CM_mstrWrBufIndex
+00C1 7401              MOV     A,#01H
+00C3 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 144
+00C4 900000      E     MOV     DPTR,#I2CM_state
+00C7 7446              MOV     A,#046H
+00C9 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 145
+00CA 020000      R     LJMP    ?C0002
+00CD         ?C0008:
+                                           ; SOURCE LINE # 147
+00CD 900000      E     MOV     DPTR,#I2CM_mstrControl
+00D0 E0                MOVX    A,@DPTR
+00D1 FF                MOV     R7,A
+00D2 EF                MOV     A,R7
+00D3 5402              ANL     A,#02H
+00D5 FF                MOV     R7,A
+00D6 7E00              MOV     R6,#00H
+00D8 EF                MOV     A,R7
+00D9 4E                ORL     A,R6
+00DA 601D              JZ      ?C0017
+                                           ; SOURCE LINE # 148
+                                           ; SOURCE LINE # 150
+00DC 900000      E     MOV     DPTR,#I2CM_mstrStatus
+00DF E0                MOVX    A,@DPTR
+00E0 FF                MOV     R7,A
+00E1 EF                MOV     A,R7
+00E2 440A              ORL     A,#0AH
+00E4 FF                MOV     R7,A
+00E5 900000      E     MOV     DPTR,#I2CM_mstrStatus
+00E8 EF                MOV     A,R7
+00E9 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 153
+00EA 900000      E     MOV     DPTR,#I2CM_state
+00ED 7460              MOV     A,#060H
+00EF F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 154
+00F0 9044C9            MOV     DPTR,#044C9H
+00F3 7480              MOV     A,#080H
+00F5 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 155
+00F6 020000      R     LJMP    ?C0002
+                                           ; SOURCE LINE # 157
+00F9         ?C0017:
+                                           ; SOURCE LINE # 158
+00F9 9049D6            MOV     DPTR,#049D6H
+00FC E0                MOVX    A,@DPTR
+00FD FF                MOV     R7,A
+00FE EF                MOV     A,R7
+00FF 4410              ORL     A,#010H
+0101 FF                MOV     R7,A
+0102 EF                MOV     A,R7
+0103 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 159
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 14  
+
+0104 9049D9            MOV     DPTR,#049D9H
+0107 7410              MOV     A,#010H
+0109 F0                MOVX    @DPTR,A
+010A 9049D7            MOV     DPTR,#049D7H
+010D 7404              MOV     A,#04H
+010F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 160
+                                           ; SOURCE LINE # 161
+0110 020000      R     LJMP    ?C0002
+                                           ; SOURCE LINE # 163
+0113         ?C0024:
+                                           ; SOURCE LINE # 164
+0113 9049D7            MOV     DPTR,#049D7H
+0116 E4                CLR     A
+0117 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 166
+0118 900000      E     MOV     DPTR,#I2CM_state
+011B 744A              MOV     A,#04AH
+011D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 167
+                                           ; SOURCE LINE # 168
+011E 020000      R     LJMP    ?C0002
+0121         ?C0006:
+                                           ; SOURCE LINE # 170
+0121 900000      R     MOV     DPTR,#tmpCsr
+0124 E0                MOVX    A,@DPTR
+0125 FF                MOV     R7,A
+0126 EF                MOV     A,R7
+0127 540A              ANL     A,#0AH
+0129 FF                MOV     R7,A
+012A 7E00              MOV     R6,#00H
+012C EF                MOV     A,R7
+012D 640A              XRL     A,#0AH
+012F 4E                ORL     A,R6
+0130 706E              JNZ     ?C0026
+                                           ; SOURCE LINE # 171
+                                           ; SOURCE LINE # 173
+0132 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0135 E0                MOVX    A,@DPTR
+0136 FF                MOV     R7,A
+0137 EF                MOV     A,R7
+0138 44A0              ORL     A,#0A0H
+013A FF                MOV     R7,A
+013B 900000      E     MOV     DPTR,#I2CM_mstrStatus
+013E EF                MOV     A,R7
+013F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 176
+0140 900000      E     MOV     DPTR,#I2CM_mstrControl
+0143 E0                MOVX    A,@DPTR
+0144 FF                MOV     R7,A
+0145 EF                MOV     A,R7
+0146 5402              ANL     A,#02H
+0148 FF                MOV     R7,A
+0149 7E00              MOV     R6,#00H
+014B EF                MOV     A,R7
+014C 4E                ORL     A,R6
+014D 6037              JZ      ?C0033
+                                           ; SOURCE LINE # 177
+                                           ; SOURCE LINE # 178
+014F 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0152 E0                MOVX    A,@DPTR
+0153 FF                MOV     R7,A
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 15  
+
+0154 900000      E     MOV     DPTR,#I2CM_state
+0157 E0                MOVX    A,@DPTR
+0158 FE                MOV     R6,A
+0159 EE                MOV     A,R6
+015A 5408              ANL     A,#08H
+015C FE                MOV     R6,A
+015D EE                MOV     A,R6
+015E FD                MOV     R5,A
+015F 7C00              MOV     R4,#00H
+0161 ED                MOV     A,R5
+0162 4C                ORL     A,R4
+0163 6004              JZ      ?C0028
+0165 7E01              MOV     R6,#01H
+0167 8002              SJMP    ?C0029
+0169         ?C0028:
+0169 7E02              MOV     R6,#02H
+016B         ?C0029:
+016B EE                MOV     A,R6
+016C 4408              ORL     A,#08H
+016E FE                MOV     R6,A
+016F EF                MOV     A,R7
+0170 4E                ORL     A,R6
+0171 FF                MOV     R7,A
+0172 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0175 EF                MOV     A,R7
+0176 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 181
+0177 900000      E     MOV     DPTR,#I2CM_state
+017A 7460              MOV     A,#060H
+017C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 182
+017D 9044C9            MOV     DPTR,#044C9H
+0180 7480              MOV     A,#080H
+0182 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 183
+0183 020000      R     LJMP    ?C0002
+                                           ; SOURCE LINE # 185
+0186         ?C0033:
+                                           ; SOURCE LINE # 186
+0186 9049D6            MOV     DPTR,#049D6H
+0189 E0                MOVX    A,@DPTR
+018A FF                MOV     R7,A
+018B EF                MOV     A,R7
+018C 4410              ORL     A,#010H
+018E FF                MOV     R7,A
+018F EF                MOV     A,R7
+0190 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 187
+0191 9049D9            MOV     DPTR,#049D9H
+0194 7410              MOV     A,#010H
+0196 F0                MOVX    @DPTR,A
+0197 9049D7            MOV     DPTR,#049D7H
+019A 7404              MOV     A,#04H
+019C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 188
+                                           ; SOURCE LINE # 189
+019D 020000      R     LJMP    ?C0002
+01A0         ?C0026:
+                                           ; SOURCE LINE # 191
+                                           ; SOURCE LINE # 199
+01A0 7F00              MOV     R7,#00H
+01A2 120000      E     LCALL   _?CyHalt
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 16  
+
+                                           ; SOURCE LINE # 201
+                                           ; SOURCE LINE # 202
+01A5 020000      R     LJMP    ?C0002
+                                           ; SOURCE LINE # 204
+01A8         ?C0039:
+                                           ; SOURCE LINE # 206
+01A8 900000      R     MOV     DPTR,#tmpCsr
+01AB E0                MOVX    A,@DPTR
+01AC FF                MOV     R7,A
+01AD EF                MOV     A,R7
+01AE 5402              ANL     A,#02H
+01B0 FF                MOV     R7,A
+01B1 7E00              MOV     R6,#00H
+01B3 EF                MOV     A,R7
+01B4 4E                ORL     A,R6
+01B5 707E              JNZ     ?C0040
+                                           ; SOURCE LINE # 207
+                                           ; SOURCE LINE # 209
+01B7 900000      E     MOV     DPTR,#I2CM_mstrWrBufSize
+01BA E0                MOVX    A,@DPTR
+01BB FF                MOV     R7,A
+01BC 900000      E     MOV     DPTR,#I2CM_mstrWrBufIndex
+01BF E0                MOVX    A,@DPTR
+01C0 FE                MOV     R6,A
+01C1 EE                MOV     A,R6
+01C2 C3                CLR     C
+01C3 9F                SUBB    A,R7
+01C4 5029              JNC     ?C0041
+                                           ; SOURCE LINE # 210
+                                           ; SOURCE LINE # 211
+01C6 900000      E     MOV     DPTR,#I2CM_mstrWrBufPtr
+01C9 120000      E     LCALL   ?C?PLDXDATA
+01CC 900000      E     MOV     DPTR,#I2CM_mstrWrBufIndex
+01CF E0                MOVX    A,@DPTR
+01D0 FF                MOV     R7,A
+01D1 E9                MOV     A,R1
+01D2 2F                ADD     A,R7
+01D3 F9                MOV     R1,A
+01D4 E4                CLR     A
+01D5 3A                ADDC    A,R2
+01D6 FA                MOV     R2,A
+01D7 120000      E     LCALL   ?C?CLDPTR
+01DA FF                MOV     R7,A
+01DB 9049D8            MOV     DPTR,#049D8H
+01DE EF                MOV     A,R7
+01DF F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 213
+01E0 9049D7            MOV     DPTR,#049D7H
+01E3 7404              MOV     A,#04H
+01E5 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 214
+01E6 900000      E     MOV     DPTR,#I2CM_mstrWrBufIndex
+01E9 E0                MOVX    A,@DPTR
+01EA 04                INC     A
+01EB F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 215
+01EC 020000      R     LJMP    ?C0002
+01EF         ?C0041:
+                                           ; SOURCE LINE # 217
+01EF 900000      E     MOV     DPTR,#I2CM_mstrControl
+01F2 E0                MOVX    A,@DPTR
+01F3 FF                MOV     R7,A
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 17  
+
+01F4 EF                MOV     A,R7
+01F5 5402              ANL     A,#02H
+01F7 FF                MOV     R7,A
+01F8 7E00              MOV     R6,#00H
+01FA EF                MOV     A,R7
+01FB 4E                ORL     A,R6
+01FC 601D              JZ      ?C0050
+                                           ; SOURCE LINE # 218
+                                           ; SOURCE LINE # 220
+01FE 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0201 E0                MOVX    A,@DPTR
+0202 FF                MOV     R7,A
+0203 EF                MOV     A,R7
+0204 440A              ORL     A,#0AH
+0206 FF                MOV     R7,A
+0207 900000      E     MOV     DPTR,#I2CM_mstrStatus
+020A EF                MOV     A,R7
+020B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 223
+020C 900000      E     MOV     DPTR,#I2CM_state
+020F 7460              MOV     A,#060H
+0211 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 224
+0212 9044C9            MOV     DPTR,#044C9H
+0215 7480              MOV     A,#080H
+0217 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 225
+0218 020000      R     LJMP    ?C0002
+                                           ; SOURCE LINE # 227
+021B         ?C0050:
+                                           ; SOURCE LINE # 228
+021B 9049D6            MOV     DPTR,#049D6H
+021E E0                MOVX    A,@DPTR
+021F FF                MOV     R7,A
+0220 EF                MOV     A,R7
+0221 4410              ORL     A,#010H
+0223 FF                MOV     R7,A
+0224 EF                MOV     A,R7
+0225 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 229
+0226 9049D9            MOV     DPTR,#049D9H
+0229 7410              MOV     A,#010H
+022B F0                MOVX    @DPTR,A
+022C 9049D7            MOV     DPTR,#049D7H
+022F 7404              MOV     A,#04H
+0231 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 230
+                                           ; SOURCE LINE # 231
+0232 020000      R     LJMP    ?C0002
+0235         ?C0040:
+                                           ; SOURCE LINE # 233
+0235 900000      E     MOV     DPTR,#I2CM_mstrControl
+0238 E0                MOVX    A,@DPTR
+0239 FF                MOV     R7,A
+023A EF                MOV     A,R7
+023B 5402              ANL     A,#02H
+023D FF                MOV     R7,A
+023E 7E00              MOV     R6,#00H
+0240 EF                MOV     A,R7
+0241 4E                ORL     A,R6
+0242 601D              JZ      ?C0059
+                                           ; SOURCE LINE # 234
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 18  
+
+                                           ; SOURCE LINE # 236
+0244 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0247 E0                MOVX    A,@DPTR
+0248 FF                MOV     R7,A
+0249 EF                MOV     A,R7
+024A 449A              ORL     A,#09AH
+024C FF                MOV     R7,A
+024D 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0250 EF                MOV     A,R7
+0251 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 241
+0252 900000      E     MOV     DPTR,#I2CM_state
+0255 7460              MOV     A,#060H
+0257 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 242
+0258 9044C9            MOV     DPTR,#044C9H
+025B 7480              MOV     A,#080H
+025D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 243
+025E 020000      R     LJMP    ?C0002
+                                           ; SOURCE LINE # 245
+0261         ?C0059:
+                                           ; SOURCE LINE # 246
+0261 9049D6            MOV     DPTR,#049D6H
+0264 E0                MOVX    A,@DPTR
+0265 FF                MOV     R7,A
+0266 EF                MOV     A,R7
+0267 4410              ORL     A,#010H
+0269 FF                MOV     R7,A
+026A EF                MOV     A,R7
+026B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 247
+026C 9049D9            MOV     DPTR,#049D9H
+026F 7410              MOV     A,#010H
+0271 F0                MOVX    @DPTR,A
+0272 9049D7            MOV     DPTR,#049D7H
+0275 7404              MOV     A,#04H
+0277 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 250
+0278 900000      E     MOV     DPTR,#I2CM_mstrStatus
+027B E0                MOVX    A,@DPTR
+027C FF                MOV     R7,A
+027D EF                MOV     A,R7
+027E 4490              ORL     A,#090H
+0280 FF                MOV     R7,A
+0281 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0284 EF                MOV     A,R7
+0285 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 252
+                                           ; SOURCE LINE # 254
+0286 8079              SJMP    ?C0002
+                                           ; SOURCE LINE # 256
+0288         ?C0063:
+                                           ; SOURCE LINE # 258
+0288 9049D8            MOV     DPTR,#049D8H
+028B E0                MOVX    A,@DPTR
+028C FF                MOV     R7,A
+028D 900000      E     MOV     DPTR,#I2CM_mstrRdBufPtr
+0290 120000      E     LCALL   ?C?PLDXDATA
+0293 900000      E     MOV     DPTR,#I2CM_mstrRdBufIndex
+0296 E0                MOVX    A,@DPTR
+0297 FE                MOV     R6,A
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 19  
+
+0298 E9                MOV     A,R1
+0299 2E                ADD     A,R6
+029A F9                MOV     R1,A
+029B E4                CLR     A
+029C 3A                ADDC    A,R2
+029D FA                MOV     R2,A
+029E EF                MOV     A,R7
+029F 120000      E     LCALL   ?C?CSTPTR
+                                           ; SOURCE LINE # 259
+02A2 900000      E     MOV     DPTR,#I2CM_mstrRdBufIndex
+02A5 E0                MOVX    A,@DPTR
+02A6 04                INC     A
+02A7 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 262
+02A8 900000      E     MOV     DPTR,#I2CM_mstrRdBufSize
+02AB E0                MOVX    A,@DPTR
+02AC FF                MOV     R7,A
+02AD 900000      E     MOV     DPTR,#I2CM_mstrRdBufIndex
+02B0 E0                MOVX    A,@DPTR
+02B1 FE                MOV     R6,A
+02B2 EE                MOV     A,R6
+02B3 C3                CLR     C
+02B4 9F                SUBB    A,R7
+02B5 5008              JNC     ?C0064
+                                           ; SOURCE LINE # 263
+                                           ; SOURCE LINE # 264
+02B7 9049D7            MOV     DPTR,#049D7H
+02BA 7410              MOV     A,#010H
+02BC F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 265
+02BD 8042              SJMP    ?C0002
+02BF         ?C0064:
+                                           ; SOURCE LINE # 267
+02BF 900000      E     MOV     DPTR,#I2CM_mstrControl
+02C2 E0                MOVX    A,@DPTR
+02C3 FF                MOV     R7,A
+02C4 EF                MOV     A,R7
+02C5 5402              ANL     A,#02H
+02C7 FF                MOV     R7,A
+02C8 7E00              MOV     R6,#00H
+02CA EF                MOV     A,R7
+02CB 4E                ORL     A,R6
+02CC 601C              JZ      ?C0073
+                                           ; SOURCE LINE # 268
+                                           ; SOURCE LINE # 270
+02CE 900000      E     MOV     DPTR,#I2CM_mstrStatus
+02D1 E0                MOVX    A,@DPTR
+02D2 FF                MOV     R7,A
+02D3 EF                MOV     A,R7
+02D4 4409              ORL     A,#09H
+02D6 FF                MOV     R7,A
+02D7 900000      E     MOV     DPTR,#I2CM_mstrStatus
+02DA EF                MOV     A,R7
+02DB F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 273
+02DC 900000      E     MOV     DPTR,#I2CM_state
+02DF 7460              MOV     A,#060H
+02E1 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 274
+02E2 9044C9            MOV     DPTR,#044C9H
+02E5 7480              MOV     A,#080H
+02E7 F0                MOVX    @DPTR,A
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 20  
+
+                                           ; SOURCE LINE # 275
+02E8 8017              SJMP    ?C0002
+                                           ; SOURCE LINE # 277
+02EA         ?C0073:
+                                           ; SOURCE LINE # 278
+02EA 9049D6            MOV     DPTR,#049D6H
+02ED E0                MOVX    A,@DPTR
+02EE FF                MOV     R7,A
+02EF EF                MOV     A,R7
+02F0 4410              ORL     A,#010H
+02F2 FF                MOV     R7,A
+02F3 EF                MOV     A,R7
+02F4 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 279
+02F5 9049D7            MOV     DPTR,#049D7H
+02F8 E4                CLR     A
+02F9 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 280
+                                           ; SOURCE LINE # 281
+02FA 8005              SJMP    ?C0002
+                                           ; SOURCE LINE # 283
+02FC         ?C0077:
+                                           ; SOURCE LINE # 291
+02FC 7F00              MOV     R7,#00H
+02FE 120000      E     LCALL   _?CyHalt
+                                           ; SOURCE LINE # 294
+                                           ; SOURCE LINE # 295
+                                           ; SOURCE LINE # 296
+0301         ?C0002:
+                                           ; SOURCE LINE # 299
+0301 900000      R     MOV     DPTR,#tmpCsr
+0304 E0                MOVX    A,@DPTR
+0305 FF                MOV     R7,A
+0306 EF                MOV     A,R7
+0307 5420              ANL     A,#020H
+0309 FF                MOV     R7,A
+030A 7E00              MOV     R6,#00H
+030C EF                MOV     A,R7
+030D 4E                ORL     A,R6
+030E 604C              JZ      ?C0088
+                                           ; SOURCE LINE # 300
+                                           ; SOURCE LINE # 301
+0310 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0313 E0                MOVX    A,@DPTR
+0314 FF                MOV     R7,A
+0315 900000      E     MOV     DPTR,#I2CM_state
+0318 E0                MOVX    A,@DPTR
+0319 FE                MOV     R6,A
+031A EE                MOV     A,R6
+031B 5408              ANL     A,#08H
+031D FE                MOV     R6,A
+031E EE                MOV     A,R6
+031F FD                MOV     R5,A
+0320 7C00              MOV     R4,#00H
+0322 ED                MOV     A,R5
+0323 4C                ORL     A,R4
+0324 6004              JZ      ?C0080
+0326 7E01              MOV     R6,#01H
+0328 8002              SJMP    ?C0081
+032A         ?C0080:
+032A 7E02              MOV     R6,#02H
+032C         ?C0081:
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 21  
+
+032C EF                MOV     A,R7
+032D 4E                ORL     A,R6
+032E FF                MOV     R7,A
+032F 900000      E     MOV     DPTR,#I2CM_mstrStatus
+0332 EF                MOV     A,R7
+0333 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 303
+0334 9049D6            MOV     DPTR,#049D6H
+0337 E0                MOVX    A,@DPTR
+0338 FF                MOV     R7,A
+0339 EF                MOV     A,R7
+033A 54EF              ANL     A,#0EFH
+033C FF                MOV     R7,A
+033D EF                MOV     A,R7
+033E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 304
+033F 900000      E     MOV     DPTR,#I2CM_state
+0342 7410              MOV     A,#010H
+0344 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 305
+                                           ; SOURCE LINE # 307
+0345 8015              SJMP    ?C0088
+0347         ?C0001:
+                                           ; SOURCE LINE # 308
+0347 900000      E     MOV     DPTR,#I2CM_state
+034A E0                MOVX    A,@DPTR
+034B FF                MOV     R7,A
+034C EF                MOV     A,R7
+034D 5410              ANL     A,#010H
+034F FF                MOV     R7,A
+0350 7E00              MOV     R6,#00H
+0352 EF                MOV     A,R7
+0353 4E                ORL     A,R6
+0354 7006              JNZ     ?C0088
+                                           ; SOURCE LINE # 309
+                                           ; SOURCE LINE # 514
+0356         ?C0086:
+                                           ; SOURCE LINE # 516
+                                           ; SOURCE LINE # 518
+0356 900000      E     MOV     DPTR,#I2CM_state
+0359 7410              MOV     A,#010H
+035B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 519
+                                           ; SOURCE LINE # 524
+035C         ?C0088:
+035C D007              POP     AR7
+035E D006              POP     AR6
+0360 D005              POP     AR5
+0362 D004              POP     AR4
+0364 D003              POP     AR3
+0366 D002              POP     AR2
+0368 D001              POP     AR1
+036A D000              POP     AR0
+036C D0D0              POP     PSW
+036E D000        E     POP     ?C?XPAGE1SFR
+0370 D086              POP     DPS
+0372 D084              POP     DPL1
+0374 D085              POP     DPH1
+0376 D082              POP     DPL
+0378 D083              POP     DPH
+037A D0F0              POP     B
+037C D0E0              POP     ACC
+C51 COMPILER V9.51   I2CM_INT                                                              10/28/2016 13:50:56 PAGE 22  
+
+037E 32                RETI    
+             ; FUNCTION I2CM_ISR (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    895    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----       1
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

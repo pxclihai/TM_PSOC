@@ -1,0 +1,2063 @@
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE I2CM_MASTER
+OBJECT MODULE PLACED IN .\DP8051\DP8051_Keil_951\Debug\I2CM_MASTER.obj
+COMPILER INVOKED BY: C:\Program Files (x86)\Cypress\PSoC Creator\3.3\PSoC Creator\import\keil\pk51\9.51\C51\BIN\c51.exe 
+                    -.\Generated_Source\PSoC3\I2CM_MASTER.c NOIV LARGE MODDP2 OMF2 VB(1) NOIP INCDIR(.,Generated_Source\PSoC3) FF(3) DB WL(2)
+                    - PR(.\DP8051\DP8051_Keil_951\Debug/I2CM_MASTER.lst) CD OT(2,SIZE) OJ(.\DP8051\DP8051_Keil_951\Debug\I2CM_MASTER.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2          * File Name: I2CM_MASTER.c
+   3          * Version 3.50
+   4          *
+   5          * Description:
+   6          *  This file provides the source code of APIs for the I2C component master mode.
+   7          *
+   8          *******************************************************************************
+   9          * Copyright 2012-2015, Cypress Semiconductor Corporation. All rights reserved.
+  10          * You may use this file only in accordance with the license, terms, conditions,
+  11          * disclaimers, and limitations in the end user license agreement accompanying
+  12          * the software package with which this file was provided.
+  13          *******************************************************************************/
+  14          
+  15          #include "I2CM_PVT.h"
+  16          
+  17          #if(I2CM_MODE_MASTER_ENABLED)
+  18          
+  19          /**********************************
+  20          *      System variables
+  21          **********************************/
+  22          
+  23          volatile uint8 I2CM_mstrStatus;     /* Master Status byte  */
+  24          volatile uint8 I2CM_mstrControl;    /* Master Control byte */
+  25          
+  26          /* Transmit buffer variables */
+  27          volatile uint8 * I2CM_mstrRdBufPtr;     /* Pointer to Master Read buffer */
+  28          volatile uint8   I2CM_mstrRdBufSize;    /* Master Read buffer size       */
+  29          volatile uint8   I2CM_mstrRdBufIndex;   /* Master Read buffer Index      */
+  30          
+  31          /* Receive buffer variables */
+  32          volatile uint8 * I2CM_mstrWrBufPtr;     /* Pointer to Master Write buffer */
+  33          volatile uint8   I2CM_mstrWrBufSize;    /* Master Write buffer size       */
+  34          volatile uint8   I2CM_mstrWrBufIndex;   /* Master Write buffer Index      */
+  35          
+  36          
+  37          /*******************************************************************************
+  38          * Function Name: I2CM_MasterWriteBuf
+  39          ********************************************************************************
+  40          *
+  41          * Summary:
+  42          *  Automatically writes an entire buffer of data to a slave device. Once the
+  43          *  data transfer is initiated by this function, further data transfer is handled
+  44          *  by the included ISR in byte by byte mode.
+  45          *
+  46          * Parameters:
+  47          *  slaveAddr: 7-bit slave address.
+  48          *  xferData:  Pointer to buffer of data to be sent.
+  49          *  cnt:       Size of buffer to send.
+  50          *  mode:      Transfer mode defines: start or restart condition generation at
+  51          *             begin of the transfer and complete the transfer or halt before
+  52          *             generating a stop.
+  53          *
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 2   
+
+  54          * Return:
+  55          *  Status error - Zero means no errors.
+  56          *
+  57          * Side Effects:
+  58          *  The included ISR will start a transfer after a start or restart condition is
+  59          *  generated.
+  60          *
+  61          * Global variables:
+  62          *  I2CM_mstrStatus  - The global variable used to store a current
+  63          *                                 status of the I2C Master.
+  64          *  I2CM_state       - The global variable used to store a current
+  65          *                                 state of the software FSM.
+  66          *  I2CM_mstrControl - The global variable used to control the master
+  67          *                                 end of a transaction with or without Stop
+  68          *                                 generation.
+  69          *  I2CM_mstrWrBufPtr - The global variable used to store a pointer
+  70          *                                  to the master write buffer.
+  71          *  I2CM_mstrWrBufIndex - The global variable used to store current
+  72          *                                    index within the master write buffer.
+  73          *  I2CM_mstrWrBufSize - The global variable used to store a master
+  74          *                                   write buffer size.
+  75          *
+  76          * Reentrant:
+  77          *  No
+  78          *
+  79          *******************************************************************************/
+  80          uint8 I2CM_MasterWriteBuf(uint8 slaveAddress, uint8 * wrData, uint8 cnt, uint8 mode)
+  81                
+  82          {
+  83   1          uint8 errStatus;
+  84   1      
+  85   1          errStatus = I2CM_MSTR_NOT_READY;
+  86   1      
+  87   1          if(NULL != wrData)
+  88   1          {
+  89   2              /* Check I2C state to allow transfer: valid states are IDLE or HALT */
+  90   2              if(I2CM_SM_IDLE == I2CM_state)
+  91   2              {
+  92   3                  /* Master is ready for transaction: check if bus is free */
+  93   3                  if(I2CM_CHECK_BUS_FREE(I2CM_MCSR_REG))
+  94   3                  {
+  95   4                      errStatus = I2CM_MSTR_NO_ERROR;
+  96   4                  }
+  97   3                  else
+  98   3                  {
+  99   4                      errStatus = I2CM_MSTR_BUS_BUSY;
+ 100   4                  }
+ 101   3              }
+ 102   2              else if(I2CM_SM_MSTR_HALT == I2CM_state)
+ 103   2              {
+ 104   3                  /* Master is ready and waiting for ReStart */
+ 105   3                  errStatus = I2CM_MSTR_NO_ERROR;
+ 106   3      
+ 107   3                  I2CM_ClearPendingInt();
+ 108   3                  I2CM_mstrStatus &= (uint8) ~I2CM_MSTAT_XFER_HALT;
+ 109   3              }
+ 110   2              else
+ 111   2              {
+ 112   3                  /* errStatus = I2CM_MSTR_NOT_READY was send before */
+ 113   3              }
+ 114   2      
+ 115   2              if(I2CM_MSTR_NO_ERROR == errStatus)
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 3   
+
+ 116   2              {
+ 117   3                  /* Set state to start write transaction */
+ 118   3                  I2CM_state = I2CM_SM_MSTR_WR_ADDR;
+ 119   3      
+ 120   3                  /* Prepare write buffer */
+ 121   3                  I2CM_mstrWrBufIndex = 0u;
+ 122   3                  I2CM_mstrWrBufSize  = cnt;
+ 123   3                  I2CM_mstrWrBufPtr   = (volatile uint8 *) wrData;
+ 124   3      
+ 125   3                  /* Set end of transaction flag: Stop or Halt (following ReStart) */
+ 126   3                  I2CM_mstrControl = mode;
+ 127   3      
+ 128   3                  /* Clear write status history */
+ 129   3                  I2CM_mstrStatus &= (uint8) ~I2CM_MSTAT_WR_CMPLT;
+ 130   3      
+ 131   3                  /* Hardware actions: write address and generate Start or ReStart */
+ 132   3                  I2CM_DATA_REG = (uint8) (slaveAddress << I2CM_SLAVE_ADDR_SHIFT);
+ 133   3      
+ 134   3                  if(I2CM_CHECK_RESTART(mode))
+ 135   3                  {
+ 136   4                      I2CM_GENERATE_RESTART;
+ 137   4                  }
+ 138   3                  else
+ 139   3                  {
+ 140   4                      I2CM_GENERATE_START;
+ 141   4                  }
+ 142   3      
+ 143   3                  /* Enable interrupt to complete transfer */
+ 144   3                  I2CM_EnableInt();
+ 145   3              }
+ 146   2          }
+ 147   1      
+ 148   1          return(errStatus);
+ 149   1      }
+ 150          
+ 151          
+ 152          /*******************************************************************************
+ 153          * Function Name: I2CM_MasterReadBuf
+ 154          ********************************************************************************
+ 155          *
+ 156          * Summary:
+ 157          *  Automatically writes an entire buffer of data to a slave device. Once the
+ 158          *  data transfer is initiated by this function, further data transfer is handled
+ 159          *  by the included ISR in byte by byte mode.
+ 160          *
+ 161          * Parameters:
+ 162          *  slaveAddr: 7-bit slave address.
+ 163          *  xferData:  Pointer to buffer where to put data from slave.
+ 164          *  cnt:       Size of buffer to read.
+ 165          *  mode:      Transfer mode defines: start or restart condition generation at
+ 166          *             begin of the transfer and complete the transfer or halt before
+ 167          *             generating a stop.
+ 168          *
+ 169          * Return:
+ 170          *  Status error - Zero means no errors.
+ 171          *
+ 172          * Side Effects:
+ 173          *  The included ISR will start a transfer after start or restart condition is
+ 174          *  generated.
+ 175          *
+ 176          * Global variables:
+ 177          *  I2CM_mstrStatus  - The global variable used to store a current
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 4   
+
+ 178          *                                 status of the I2C Master.
+ 179          *  I2CM_state       - The global variable used to store a current
+ 180          *                                 state of the software FSM.
+ 181          *  I2CM_mstrControl - The global variable used to control the master
+ 182          *                                 end of a transaction with or without
+ 183          *                                 Stop generation.
+ 184          *  I2CM_mstrRdBufPtr - The global variable used to store a pointer
+ 185          *                                  to the master write buffer.
+ 186          *  I2CM_mstrRdBufIndex - The global variable  used to store a
+ 187          *                                    current index within the master
+ 188          *                                    write buffer.
+ 189          *  I2CM_mstrRdBufSize - The global variable used to store a master
+ 190          *                                   write buffer size.
+ 191          *
+ 192          * Reentrant:
+ 193          *  No.
+ 194          *
+ 195          *******************************************************************************/
+ 196          uint8 I2CM_MasterReadBuf(uint8 slaveAddress, uint8 * rdData, uint8 cnt, uint8 mode)
+ 197                
+ 198          {
+ 199   1          uint8 errStatus;
+ 200   1      
+ 201   1          errStatus = I2CM_MSTR_NOT_READY;
+ 202   1      
+ 203   1          if(NULL != rdData)
+ 204   1          {
+ 205   2              /* Check I2C state to allow transfer: valid states are IDLE or HALT */
+ 206   2              if(I2CM_SM_IDLE == I2CM_state)
+ 207   2              {
+ 208   3                  /* Master is ready to transaction: check if bus is free */
+ 209   3                  if(I2CM_CHECK_BUS_FREE(I2CM_MCSR_REG))
+ 210   3                  {
+ 211   4                      errStatus = I2CM_MSTR_NO_ERROR;
+ 212   4                  }
+ 213   3                  else
+ 214   3                  {
+ 215   4                      errStatus = I2CM_MSTR_BUS_BUSY;
+ 216   4                  }
+ 217   3              }
+ 218   2              else if(I2CM_SM_MSTR_HALT == I2CM_state)
+ 219   2              {
+ 220   3                  /* Master is ready and waiting for ReStart */
+ 221   3                  errStatus = I2CM_MSTR_NO_ERROR;
+ 222   3      
+ 223   3                  I2CM_ClearPendingInt();
+ 224   3                  I2CM_mstrStatus &= (uint8) ~I2CM_MSTAT_XFER_HALT;
+ 225   3              }
+ 226   2              else
+ 227   2              {
+ 228   3                  /* errStatus = I2CM_MSTR_NOT_READY was set before */
+ 229   3              }
+ 230   2      
+ 231   2              if(I2CM_MSTR_NO_ERROR == errStatus)
+ 232   2              {
+ 233   3                  /* Set state to start write transaction */
+ 234   3                  I2CM_state = I2CM_SM_MSTR_RD_ADDR;
+ 235   3      
+ 236   3                  /* Prepare read buffer */
+ 237   3                  I2CM_mstrRdBufIndex  = 0u;
+ 238   3                  I2CM_mstrRdBufSize   = cnt;
+ 239   3                  I2CM_mstrRdBufPtr    = (volatile uint8 *) rdData;
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 5   
+
+ 240   3      
+ 241   3                  /* Set end of transaction flag: Stop or Halt (following ReStart) */
+ 242   3                  I2CM_mstrControl = mode;
+ 243   3      
+ 244   3                  /* Clear read status history */
+ 245   3                  I2CM_mstrStatus &= (uint8) ~I2CM_MSTAT_RD_CMPLT;
+ 246   3      
+ 247   3                  /* Hardware actions: write address and generate Start or ReStart */
+ 248   3                  I2CM_DATA_REG = ((uint8) (slaveAddress << I2CM_SLAVE_ADDR_SHIFT) |
+ 249   3                                                        I2CM_READ_FLAG);
+ 250   3      
+ 251   3                  if(I2CM_CHECK_RESTART(mode))
+ 252   3                  {
+ 253   4                      I2CM_GENERATE_RESTART;
+ 254   4                  }
+ 255   3                  else
+ 256   3                  {
+ 257   4                      I2CM_GENERATE_START;
+ 258   4                  }
+ 259   3      
+ 260   3                  /* Enable interrupt to complete transfer */
+ 261   3                  I2CM_EnableInt();
+ 262   3              }
+ 263   2          }
+ 264   1      
+ 265   1          return(errStatus);
+ 266   1      }
+ 267          
+ 268          
+ 269          /*******************************************************************************
+ 270          * Function Name: I2CM_MasterSendStart
+ 271          ********************************************************************************
+ 272          *
+ 273          * Summary:
+ 274          *  Generates Start condition and sends slave address with read/write bit.
+ 275          *
+ 276          * Parameters:
+ 277          *  slaveAddress:  7-bit slave address.
+ 278          *  R_nW:          Zero, send write command, non-zero send read command.
+ 279          *
+ 280          * Return:
+ 281          *  Status error - Zero means no errors.
+ 282          *
+ 283          * Side Effects:
+ 284          *  This function is entered without a "byte complete" bit set in the I2C_CSR
+ 285          *  register. It does not exit until it is set.
+ 286          *
+ 287          * Global variables:
+ 288          *  I2CM_state - The global variable used to store a current state of
+ 289          *                           the software FSM.
+ 290          *
+ 291          * Reentrant:
+ 292          *  No.
+ 293          *
+ 294          *******************************************************************************/
+ 295          uint8 I2CM_MasterSendStart(uint8 slaveAddress, uint8 R_nW)
+ 296                
+ 297          {
+ 298   1          uint8 errStatus;
+ 299   1      
+ 300   1          errStatus = I2CM_MSTR_NOT_READY;
+ 301   1      
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 6   
+
+ 302   1          /* If IDLE, check if bus is free */
+ 303   1          if(I2CM_SM_IDLE == I2CM_state)
+ 304   1          {
+ 305   2              /* If bus is free, generate Start condition */
+ 306   2              if(I2CM_CHECK_BUS_FREE(I2CM_MCSR_REG))
+ 307   2              {
+ 308   3                  /* Disable interrupt for manual master operation */
+ 309   3                  I2CM_DisableInt();
+ 310   3      
+ 311   3                  /* Set address and read/write flag */
+ 312   3                  slaveAddress = (uint8) (slaveAddress << I2CM_SLAVE_ADDR_SHIFT);
+ 313   3                  if(0u != R_nW)
+ 314   3                  {
+ 315   4                      slaveAddress |= I2CM_READ_FLAG;
+ 316   4                      I2CM_state = I2CM_SM_MSTR_RD_ADDR;
+ 317   4                  }
+ 318   3                  else
+ 319   3                  {
+ 320   4                      I2CM_state = I2CM_SM_MSTR_WR_ADDR;
+ 321   4                  }
+ 322   3      
+ 323   3                  /* Hardware actions: write address and generate Start */
+ 324   3                  I2CM_DATA_REG = slaveAddress;
+ 325   3                  I2CM_GENERATE_START_MANUAL;
+ 326   3      
+ 327   3                  /* Wait until address is transferred */
+ 328   3                  while(I2CM_WAIT_BYTE_COMPLETE(I2CM_CSR_REG))
+ 329   3                  {
+ 330   4                  }
+ 331   3      
+ 332   3              #if(I2CM_MODE_MULTI_MASTER_SLAVE_ENABLED)
+                          if(I2CM_CHECK_START_GEN(I2CM_MCSR_REG))
+                          {
+                              I2CM_CLEAR_START_GEN;
+              
+                              /* Start condition was not generated: reset FSM to IDLE */
+                              I2CM_state = I2CM_SM_IDLE;
+                              errStatus = I2CM_MSTR_ERR_ABORT_START_GEN;
+                          }
+                          else
+                      #endif /* (I2CM_MODE_MULTI_MASTER_SLAVE_ENABLED) */
+ 343   3      
+ 344   3              #if(I2CM_MODE_MULTI_MASTER_ENABLED)
+                          if(I2CM_CHECK_LOST_ARB(I2CM_CSR_REG))
+                          {
+                              I2CM_BUS_RELEASE_MANUAL;
+              
+                              /* Master lost arbitrage: reset FSM to IDLE */
+                              I2CM_state = I2CM_SM_IDLE;
+                              errStatus = I2CM_MSTR_ERR_ARB_LOST;
+                          }
+                          else
+                      #endif /* (I2CM_MODE_MULTI_MASTER_ENABLED) */
+ 355   3      
+ 356   3                  if(I2CM_CHECK_ADDR_NAK(I2CM_CSR_REG))
+ 357   3                  {
+ 358   4                      /* Address has been NACKed: reset FSM to IDLE */
+ 359   4                      I2CM_state = I2CM_SM_IDLE;
+ 360   4                      errStatus = I2CM_MSTR_ERR_LB_NAK;
+ 361   4                  }
+ 362   3                  else
+ 363   3                  {
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 7   
+
+ 364   4                      /* Start was sent without errors */
+ 365   4                      errStatus = I2CM_MSTR_NO_ERROR;
+ 366   4                  }
+ 367   3              }
+ 368   2              else
+ 369   2              {
+ 370   3                  errStatus = I2CM_MSTR_BUS_BUSY;
+ 371   3              }
+ 372   2          }
+ 373   1      
+ 374   1          return(errStatus);
+ 375   1      }
+ 376          
+ 377          
+ 378          /*******************************************************************************
+ 379          * Function Name: I2CM_MasterSendRestart
+ 380          ********************************************************************************
+ 381          *
+ 382          * Summary:
+ 383          *  Generates ReStart condition and sends slave address with read/write bit.
+ 384          *
+ 385          * Parameters:
+ 386          *  slaveAddress:  7-bit slave address.
+ 387          *  R_nW:          Zero, send write command, non-zero send read command.
+ 388          *
+ 389          * Return:
+ 390          *  Status error - Zero means no errors.
+ 391          *
+ 392          * Side Effects:
+ 393          *  This function is entered without a "byte complete" bit set in the I2C_CSR
+ 394          *  register. It does not exit until it is set.
+ 395          *
+ 396          * Global variables:
+ 397          *  I2CM_state - The global variable used to store a current state of
+ 398          *                           the software FSM.
+ 399          *
+ 400          * Reentrant:
+ 401          *  No.
+ 402          *
+ 403          *******************************************************************************/
+ 404          uint8 I2CM_MasterSendRestart(uint8 slaveAddress, uint8 R_nW)
+ 405                
+ 406          {
+ 407   1          uint8 errStatus;
+ 408   1      
+ 409   1          errStatus = I2CM_MSTR_NOT_READY;
+ 410   1      
+ 411   1          /* Check if START condition was generated */
+ 412   1          if(I2CM_CHECK_MASTER_MODE(I2CM_MCSR_REG))
+ 413   1          {
+ 414   2              /* Set address and read/write flag */
+ 415   2              slaveAddress = (uint8) (slaveAddress << I2CM_SLAVE_ADDR_SHIFT);
+ 416   2              if(0u != R_nW)
+ 417   2              {
+ 418   3                  slaveAddress |= I2CM_READ_FLAG;
+ 419   3                  I2CM_state = I2CM_SM_MSTR_RD_ADDR;
+ 420   3              }
+ 421   2              else
+ 422   2              {
+ 423   3                  I2CM_state = I2CM_SM_MSTR_WR_ADDR;
+ 424   3              }
+ 425   2      
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 8   
+
+ 426   2              /* Hardware actions: write address and generate ReStart */
+ 427   2              I2CM_DATA_REG = slaveAddress;
+ 428   2              I2CM_GENERATE_RESTART_MANUAL;
+ 429   2      
+ 430   2              /* Wait until address has been transferred */
+ 431   2              while(I2CM_WAIT_BYTE_COMPLETE(I2CM_CSR_REG))
+ 432   2              {
+ 433   3              }
+ 434   2      
+ 435   2          #if(I2CM_MODE_MULTI_MASTER_ENABLED)
+                      if(I2CM_CHECK_LOST_ARB(I2CM_CSR_REG))
+                      {
+                          I2CM_BUS_RELEASE_MANUAL;
+              
+                          /* Master lost arbitrage: reset FSM to IDLE */
+                          I2CM_state = I2CM_SM_IDLE;
+                          errStatus = I2CM_MSTR_ERR_ARB_LOST;
+                      }
+                      else
+                  #endif /* (I2CM_MODE_MULTI_MASTER_ENABLED) */
+ 446   2      
+ 447   2              if(I2CM_CHECK_ADDR_NAK(I2CM_CSR_REG))
+ 448   2              {
+ 449   3                  /* Address has been NACKed: reset FSM to IDLE */
+ 450   3                  I2CM_state = I2CM_SM_IDLE;
+ 451   3                  errStatus = I2CM_MSTR_ERR_LB_NAK;
+ 452   3              }
+ 453   2              else
+ 454   2              {
+ 455   3                  /* ReStart was sent without errors */
+ 456   3                  errStatus = I2CM_MSTR_NO_ERROR;
+ 457   3              }
+ 458   2          }
+ 459   1      
+ 460   1          return(errStatus);
+ 461   1      }
+ 462          
+ 463          
+ 464          /*******************************************************************************
+ 465          * Function Name: I2CM_MasterSendStop
+ 466          ********************************************************************************
+ 467          *
+ 468          * Summary:
+ 469          *  Generates I2C Stop condition on bus. Function do nothing if Start or Restart
+ 470          *  condition was failed before call this function.
+ 471          *
+ 472          * Parameters:
+ 473          *  None.
+ 474          *
+ 475          * Return:
+ 476          *  Status error - Zero means no errors.
+ 477          *
+ 478          * Side Effects:
+ 479          *  Stop generation is required to complete the transaction.
+ 480          *  This function does not wait until a Stop condition is generated.
+ 481          *
+ 482          * Global variables:
+ 483          *  I2CM_state - The global variable used to store a current state of
+ 484          *                           the software FSM.
+ 485          *
+ 486          * Reentrant:
+ 487          *  No.
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 9   
+
+ 488          *
+ 489          *******************************************************************************/
+ 490          uint8 I2CM_MasterSendStop(void) 
+ 491          {
+ 492   1          uint8 errStatus;
+ 493   1      
+ 494   1          errStatus = I2CM_MSTR_NOT_READY;
+ 495   1      
+ 496   1          /* Check if master is active on bus */
+ 497   1          if(I2CM_CHECK_MASTER_MODE(I2CM_MCSR_REG))
+ 498   1          {
+ 499   2              I2CM_GENERATE_STOP_MANUAL;
+ 500   2              I2CM_state = I2CM_SM_IDLE;
+ 501   2      
+ 502   2              /* Wait until stop has been generated */
+ 503   2              while(I2CM_WAIT_STOP_COMPLETE(I2CM_CSR_REG))
+ 504   2              {
+ 505   3              }
+ 506   2      
+ 507   2              errStatus = I2CM_MSTR_NO_ERROR;
+ 508   2      
+ 509   2          #if(I2CM_MODE_MULTI_MASTER_ENABLED)
+                      if(I2CM_CHECK_LOST_ARB(I2CM_CSR_REG))
+                      {
+                          I2CM_BUS_RELEASE_MANUAL;
+              
+                          /* NACK was generated by instead Stop */
+                          errStatus = I2CM_MSTR_ERR_ARB_LOST;
+                      }
+                  #endif /* (I2CM_MODE_MULTI_MASTER_ENABLED) */
+ 518   2          }
+ 519   1      
+ 520   1          return(errStatus);
+ 521   1      }
+ 522          
+ 523          
+ 524          /*******************************************************************************
+ 525          * Function Name: I2CM_MasterWriteByte
+ 526          ********************************************************************************
+ 527          *
+ 528          * Summary:
+ 529          *  Sends one byte to a slave. A valid Start or ReStart condition must be
+ 530          *  generated before this call this function. Function do nothing if Start or
+ 531          *  Restart condition was failed before call this function.
+ 532          *
+ 533          * Parameters:
+ 534          *  data:  The data byte to send to the slave.
+ 535          *
+ 536          * Return:
+ 537          *  Status error - Zero means no errors.
+ 538          *
+ 539          * Side Effects:
+ 540          *  This function is entered without a "byte complete" bit set in the I2C_CSR
+ 541          *  register. It does not exit until it is set.
+ 542          *
+ 543          * Global variables:
+ 544          *  I2CM_state - The global variable used to store a current state of
+ 545          *                           the software FSM.
+ 546          *
+ 547          *******************************************************************************/
+ 548          uint8 I2CM_MasterWriteByte(uint8 theByte) 
+ 549          {
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 10  
+
+ 550   1          uint8 errStatus;
+ 551   1      
+ 552   1          errStatus = I2CM_MSTR_NOT_READY;
+ 553   1      
+ 554   1          /* Check if START condition was generated */
+ 555   1          if(I2CM_CHECK_MASTER_MODE(I2CM_MCSR_REG))
+ 556   1          {
+ 557   2              I2CM_DATA_REG = theByte;   /* Write DATA register */
+ 558   2              I2CM_TRANSMIT_DATA_MANUAL; /* Set transmit mode   */
+ 559   2              I2CM_state = I2CM_SM_MSTR_WR_DATA;
+ 560   2      
+ 561   2              /* Wait until data byte has been transmitted */
+ 562   2              while(I2CM_WAIT_BYTE_COMPLETE(I2CM_CSR_REG))
+ 563   2              {
+ 564   3              }
+ 565   2      
+ 566   2          #if(I2CM_MODE_MULTI_MASTER_ENABLED)
+                      if(I2CM_CHECK_LOST_ARB(I2CM_CSR_REG))
+                      {
+                          I2CM_BUS_RELEASE_MANUAL;
+              
+                          /* Master lost arbitrage: reset FSM to IDLE */
+                          I2CM_state = I2CM_SM_IDLE;
+                          errStatus = I2CM_MSTR_ERR_ARB_LOST;
+                      }
+                      /* Check LRB bit */
+                      else
+                  #endif /* (I2CM_MODE_MULTI_MASTER_ENABLED) */
+ 578   2      
+ 579   2              if(I2CM_CHECK_DATA_ACK(I2CM_CSR_REG))
+ 580   2              {
+ 581   3                  I2CM_state = I2CM_SM_MSTR_HALT;
+ 582   3                  errStatus = I2CM_MSTR_NO_ERROR;
+ 583   3              }
+ 584   2              else
+ 585   2              {
+ 586   3                  I2CM_state = I2CM_SM_MSTR_HALT;
+ 587   3                  errStatus = I2CM_MSTR_ERR_LB_NAK;
+ 588   3              }
+ 589   2          }
+ 590   1      
+ 591   1          return(errStatus);
+ 592   1      }
+ 593          
+ 594          
+ 595          /*******************************************************************************
+ 596          * Function Name: I2CM_MasterReadByte
+ 597          ********************************************************************************
+ 598          *
+ 599          * Summary:
+ 600          *  Reads one byte from a slave and ACK or NACK the transfer. A valid Start or
+ 601          *  ReStart condition must be generated before this call this function. Function
+ 602          *  do nothing if Start or Restart condition was failed before call this
+ 603          *  function.
+ 604          *
+ 605          * Parameters:
+ 606          *  acknNack:  Zero, response with NACK, if non-zero response with ACK.
+ 607          *
+ 608          * Return:
+ 609          *  Byte read from slave.
+ 610          *
+ 611          * Side Effects:
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 11  
+
+ 612          *  This function is entered without a "byte complete" bit set in the I2C_CSR
+ 613          *  register. It does not exit until it is set.
+ 614          *
+ 615          * Global variables:
+ 616          *  I2CM_state - The global variable used to store a current
+ 617          *                           state of the software FSM.
+ 618          *
+ 619          * Reentrant:
+ 620          *  No.
+ 621          *
+ 622          *******************************************************************************/
+ 623          uint8 I2CM_MasterReadByte(uint8 acknNak) 
+ 624          {
+ 625   1          uint8 theByte;
+ 626   1      
+ 627   1          theByte = 0u;
+ 628   1      
+ 629   1          /* Check if START condition was generated */
+ 630   1          if(I2CM_CHECK_MASTER_MODE(I2CM_MCSR_REG))
+ 631   1          {
+ 632   2              /* When address phase needs to release bus and receive byte,
+ 633   2              * then decide ACK or NACK
+ 634   2              */
+ 635   2              if(I2CM_SM_MSTR_RD_ADDR == I2CM_state)
+ 636   2              {
+ 637   3                  I2CM_READY_TO_READ_MANUAL;
+ 638   3                  I2CM_state = I2CM_SM_MSTR_RD_DATA;
+ 639   3              }
+ 640   2      
+ 641   2              /* Wait until data byte has been received */
+ 642   2              while(I2CM_WAIT_BYTE_COMPLETE(I2CM_CSR_REG))
+ 643   2              {
+ 644   3              }
+ 645   2      
+ 646   2              theByte = I2CM_DATA_REG;
+ 647   2      
+ 648   2              /* Command ACK to receive next byte and continue transfer.
+ 649   2              *  Do nothing for NACK. The NACK will be generated by
+ 650   2              *  Stop or ReStart routine.
+ 651   2              */
+ 652   2              if(acknNak != 0u) /* Generate ACK */
+ 653   2              {
+ 654   3                  I2CM_ACK_AND_RECEIVE_MANUAL;
+ 655   3              }
+ 656   2              else              /* Do nothing for the follwong NACK */
+ 657   2              {
+ 658   3                  I2CM_state = I2CM_SM_MSTR_HALT;
+ 659   3              }
+ 660   2          }
+ 661   1      
+ 662   1          return(theByte);
+ 663   1      }
+ 664          
+ 665          
+ 666          /*******************************************************************************
+ 667          * Function Name: I2CM_MasterStatus
+ 668          ********************************************************************************
+ 669          *
+ 670          * Summary:
+ 671          *  Returns the master's communication status.
+ 672          *
+ 673          * Parameters:
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 12  
+
+ 674          *  None.
+ 675          *
+ 676          * Return:
+ 677          *  Current status of I2C master.
+ 678          *
+ 679          * Global variables:
+ 680          *  I2CM_mstrStatus - The global variable used to store a current
+ 681          *                                status of the I2C Master.
+ 682          *
+ 683          *******************************************************************************/
+ 684          uint8 I2CM_MasterStatus(void) 
+ 685          {
+ 686   1          uint8 status;
+ 687   1      
+ 688   1          I2CM_DisableInt(); /* Lock from interrupt */
+ 689   1      
+ 690   1          /* Read master status */
+ 691   1          status = I2CM_mstrStatus;
+ 692   1      
+ 693   1          if (I2CM_CHECK_SM_MASTER)
+ 694   1          {
+ 695   2              /* Set transfer in progress flag in status */
+ 696   2              status |= I2CM_MSTAT_XFER_INP;
+ 697   2          }
+ 698   1      
+ 699   1          I2CM_EnableInt(); /* Release lock */
+ 700   1      
+ 701   1          return (status);
+ 702   1      }
+ 703          
+ 704          
+ 705          /*******************************************************************************
+ 706          * Function Name: I2CM_MasterClearStatus
+ 707          ********************************************************************************
+ 708          *
+ 709          * Summary:
+ 710          *  Clears all status flags and returns the master status.
+ 711          *
+ 712          * Parameters:
+ 713          *  None.
+ 714          *
+ 715          * Return:
+ 716          *  Current status of I2C master.
+ 717          *
+ 718          * Global variables:
+ 719          *  I2CM_mstrStatus - The global variable used to store a current
+ 720          *                                status of the I2C Master.
+ 721          *
+ 722          * Reentrant:
+ 723          *  No.
+ 724          *
+ 725          *******************************************************************************/
+ 726          uint8 I2CM_MasterClearStatus(void) 
+ 727          {
+ 728   1          uint8 status;
+ 729   1      
+ 730   1          I2CM_DisableInt(); /* Lock from interrupt */
+ 731   1      
+ 732   1          /* Read and clear master status */
+ 733   1          status = I2CM_mstrStatus;
+ 734   1          I2CM_mstrStatus = I2CM_MSTAT_CLEAR;
+ 735   1      
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 13  
+
+ 736   1          I2CM_EnableInt(); /* Release lock */
+ 737   1      
+ 738   1          return (status);
+ 739   1      }
+ 740          
+ 741          
+ 742          /*******************************************************************************
+ 743          * Function Name: I2CM_MasterGetReadBufSize
+ 744          ********************************************************************************
+ 745          *
+ 746          * Summary:
+ 747          *  Returns the amount of bytes that has been transferred with an
+ 748          *  I2C_MasterReadBuf command.
+ 749          *
+ 750          * Parameters:
+ 751          *  None.
+ 752          *
+ 753          * Return:
+ 754          *  Byte count of transfer. If the transfer is not yet complete, it will return
+ 755          *  the byte count transferred so far.
+ 756          *
+ 757          * Global variables:
+ 758          *  I2CM_mstrRdBufIndex - The global variable stores current index
+ 759          *                                    within the master read buffer.
+ 760          *
+ 761          *******************************************************************************/
+ 762          uint8 I2CM_MasterGetReadBufSize(void) 
+ 763          {
+ 764   1          return (I2CM_mstrRdBufIndex);
+ 765   1      }
+ 766          
+ 767          
+ 768          /*******************************************************************************
+ 769          * Function Name: I2CM_MasterGetWriteBufSize
+ 770          ********************************************************************************
+ 771          *
+ 772          * Summary:
+ 773          *  Returns the amount of bytes that has been transferred with an
+ 774          *  I2C_MasterWriteBuf command.
+ 775          *
+ 776          * Parameters:
+ 777          *  None.
+ 778          *
+ 779          * Return:
+ 780          *  Byte count of transfer. If the transfer is not yet complete, it will return
+ 781          *  the byte count transferred so far.
+ 782          *
+ 783          * Global variables:
+ 784          *  I2CM_mstrWrBufIndex -  The global variable used to stores current
+ 785          *                                     index within master write buffer.
+ 786          *
+ 787          *******************************************************************************/
+ 788          uint8 I2CM_MasterGetWriteBufSize(void) 
+ 789          {
+ 790   1          return (I2CM_mstrWrBufIndex);
+ 791   1      }
+ 792          
+ 793          
+ 794          /*******************************************************************************
+ 795          * Function Name: I2CM_MasterClearReadBuf
+ 796          ********************************************************************************
+ 797          *
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 14  
+
+ 798          * Summary:
+ 799          *  Resets the read buffer pointer back to the first byte in the buffer.
+ 800          *
+ 801          * Parameters:
+ 802          *  None.
+ 803          *
+ 804          * Return:
+ 805          *  None.
+ 806          *
+ 807          * Global variables:
+ 808          *  I2CM_mstrRdBufIndex - The global variable used to stores current
+ 809          *                                    index within master read buffer.
+ 810          *  I2CM_mstrStatus - The global variable used to store a current
+ 811          *                                status of the I2C Master.
+ 812          *
+ 813          * Reentrant:
+ 814          *  No.
+ 815          *
+ 816          *******************************************************************************/
+ 817          void I2CM_MasterClearReadBuf(void) 
+ 818          {
+ 819   1          I2CM_DisableInt(); /* Lock from interrupt */
+ 820   1      
+ 821   1          I2CM_mstrRdBufIndex = 0u;
+ 822   1          I2CM_mstrStatus    &= (uint8) ~I2CM_MSTAT_RD_CMPLT;
+ 823   1      
+ 824   1          I2CM_EnableInt(); /* Release lock */
+ 825   1      }
+ 826          
+ 827          
+ 828          /*******************************************************************************
+ 829          * Function Name: I2CM_MasterClearWriteBuf
+ 830          ********************************************************************************
+ 831          *
+ 832          * Summary:
+ 833          *  Resets the write buffer pointer back to the first byte in the buffer.
+ 834          *
+ 835          * Parameters:
+ 836          *  None.
+ 837          *
+ 838          * Return:
+ 839          *  None.
+ 840          *
+ 841          * Global variables:
+ 842          *  I2CM_mstrRdBufIndex - The global variable used to stote current
+ 843          *                                    index within master read buffer.
+ 844          *  I2CM_mstrStatus - The global variable used to store a current
+ 845          *                                status of the I2C Master.
+ 846          *
+ 847          * Reentrant:
+ 848          *  No.
+ 849          *
+ 850          *******************************************************************************/
+ 851          void I2CM_MasterClearWriteBuf(void) 
+ 852          {
+ 853   1          I2CM_DisableInt(); /* Lock from interrupt */
+ 854   1      
+ 855   1          I2CM_mstrWrBufIndex = 0u;
+ 856   1          I2CM_mstrStatus    &= (uint8) ~I2CM_MSTAT_WR_CMPLT;
+ 857   1      
+ 858   1          I2CM_EnableInt(); /* Release lock */
+ 859   1      }
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 15  
+
+ 860          
+ 861          #endif /* (I2CM_MODE_MASTER_ENABLED) */
+ 862          
+ 863          
+ 864          /* [] END OF FILE */
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 16  
+
+ASSEMBLY LISTING OF GENERATED OBJECT CODE
+
+
+             ; FUNCTION _I2CM_MasterWriteBuf (BEGIN)
+                                           ; SOURCE LINE # 80
+0000 900000      R     MOV     DPTR,#slaveAddress
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+0005 900000      R     MOV     DPTR,#wrData
+0008 120000      E     LCALL   ?C?PSTXDATA
+                                           ; SOURCE LINE # 82
+                                           ; SOURCE LINE # 85
+000B 900000      R     MOV     DPTR,#errStatus
+000E 7402              MOV     A,#02H
+0010 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 87
+0011 7B00              MOV     R3,#00H
+0013 7A00              MOV     R2,#00H
+0015 7900              MOV     R1,#00H
+0017 C003              PUSH    AR3
+0019 C002              PUSH    AR2
+001B C001              PUSH    AR1
+001D 900000      R     MOV     DPTR,#wrData
+0020 120000      E     LCALL   ?C?PLDXDATA
+0023 D082              POP     DPL
+0025 D083              POP     DPH
+0027 D0E0              POP     ACC
+0029 6B                XRL     A,R3
+002A 7008              JNZ     ?C0095
+002C E9                MOV     A,R1
+002D 6582              XRL     A,DPL
+002F 7003              JNZ     ?C0095
+0031 EA                MOV     A,R2
+0032 6583              XRL     A,DPH
+0034         ?C0095:
+0034 7003              JNZ     $ + 5H
+0036 020000      R     LJMP    ?C0001
+                                           ; SOURCE LINE # 88
+                                           ; SOURCE LINE # 90
+0039 900000      E     MOV     DPTR,#I2CM_state
+003C E0                MOVX    A,@DPTR
+003D FF                MOV     R7,A
+003E EF                MOV     A,R7
+003F B4101E            CJNE    A,#010H,?C0002
+                                           ; SOURCE LINE # 91
+                                           ; SOURCE LINE # 93
+0042 9049D9            MOV     DPTR,#049D9H
+0045 E0                MOVX    A,@DPTR
+0046 FF                MOV     R7,A
+0047 EF                MOV     A,R7
+0048 5408              ANL     A,#08H
+004A FF                MOV     R7,A
+004B 7E00              MOV     R6,#00H
+004D EF                MOV     A,R7
+004E 4E                ORL     A,R6
+004F 7007              JNZ     ?C0003
+                                           ; SOURCE LINE # 94
+                                           ; SOURCE LINE # 95
+0051 900000      R     MOV     DPTR,#errStatus
+0054 E4                CLR     A
+0055 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 96
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 17  
+
+0056 802A              SJMP    ?C0005
+0058         ?C0003:
+                                           ; SOURCE LINE # 98
+                                           ; SOURCE LINE # 99
+0058 900000      R     MOV     DPTR,#errStatus
+005B 7401              MOV     A,#01H
+005D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 100
+                                           ; SOURCE LINE # 101
+005E 8022              SJMP    ?C0005
+0060         ?C0002:
+                                           ; SOURCE LINE # 102
+0060 900000      E     MOV     DPTR,#I2CM_state
+0063 E0                MOVX    A,@DPTR
+0064 FF                MOV     R7,A
+0065 EF                MOV     A,R7
+0066 B46019            CJNE    A,#060H,?C0005
+                                           ; SOURCE LINE # 103
+                                           ; SOURCE LINE # 105
+0069 900000      R     MOV     DPTR,#errStatus
+006C E4                CLR     A
+006D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 107
+006E 9044D9            MOV     DPTR,#044D9H
+0071 7480              MOV     A,#080H
+0073 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 108
+0074 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0077 E0                MOVX    A,@DPTR
+0078 FF                MOV     R7,A
+0079 EF                MOV     A,R7
+007A 54F7              ANL     A,#0F7H
+007C FF                MOV     R7,A
+007D 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0080 EF                MOV     A,R7
+0081 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 109
+                                           ; SOURCE LINE # 111
+                                           ; SOURCE LINE # 113
+0082         ?C0005:
+                                           ; SOURCE LINE # 115
+0082 900000      R     MOV     DPTR,#errStatus
+0085 E0                MOVX    A,@DPTR
+0086 FF                MOV     R7,A
+0087 EF                MOV     A,R7
+0088 7070              JNZ     ?C0001
+                                           ; SOURCE LINE # 116
+                                           ; SOURCE LINE # 118
+008A 900000      E     MOV     DPTR,#I2CM_state
+008D 7445              MOV     A,#045H
+008F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 121
+0090 900000      R     MOV     DPTR,#I2CM_mstrWrBufIndex
+0093 E4                CLR     A
+0094 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 122
+0095 900000      R     MOV     DPTR,#cnt
+0098 E0                MOVX    A,@DPTR
+0099 FF                MOV     R7,A
+009A 900000      R     MOV     DPTR,#I2CM_mstrWrBufSize
+009D EF                MOV     A,R7
+009E F0                MOVX    @DPTR,A
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 18  
+
+                                           ; SOURCE LINE # 123
+009F 900000      R     MOV     DPTR,#wrData
+00A2 120000      E     LCALL   ?C?PLDXDATA
+00A5 900000      R     MOV     DPTR,#I2CM_mstrWrBufPtr
+00A8 120000      E     LCALL   ?C?PSTXDATA
+                                           ; SOURCE LINE # 126
+00AB 900000      R     MOV     DPTR,#mode
+00AE E0                MOVX    A,@DPTR
+00AF FF                MOV     R7,A
+00B0 900000      R     MOV     DPTR,#I2CM_mstrControl
+00B3 EF                MOV     A,R7
+00B4 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 129
+00B5 900000      R     MOV     DPTR,#I2CM_mstrStatus
+00B8 E0                MOVX    A,@DPTR
+00B9 FF                MOV     R7,A
+00BA EF                MOV     A,R7
+00BB 54FD              ANL     A,#0FDH
+00BD FF                MOV     R7,A
+00BE 900000      R     MOV     DPTR,#I2CM_mstrStatus
+00C1 EF                MOV     A,R7
+00C2 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 132
+00C3 900000      R     MOV     DPTR,#slaveAddress
+00C6 E0                MOVX    A,@DPTR
+00C7 FF                MOV     R7,A
+00C8 EF                MOV     A,R7
+00C9 25E0              ADD     A,ACC
+00CB FF                MOV     R7,A
+00CC 9049D8            MOV     DPTR,#049D8H
+00CF EF                MOV     A,R7
+00D0 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 134
+00D1 900000      R     MOV     DPTR,#mode
+00D4 E0                MOVX    A,@DPTR
+00D5 FF                MOV     R7,A
+00D6 EF                MOV     A,R7
+00D7 5401              ANL     A,#01H
+00D9 FF                MOV     R7,A
+00DA 7E00              MOV     R6,#00H
+00DC EF                MOV     A,R7
+00DD 4E                ORL     A,R6
+00DE 600E              JZ      ?C0016
+                                           ; SOURCE LINE # 135
+                                           ; SOURCE LINE # 136
+00E0 9049D9            MOV     DPTR,#049D9H
+00E3 7412              MOV     A,#012H
+00E5 F0                MOVX    @DPTR,A
+00E6 9049D7            MOV     DPTR,#049D7H
+00E9 7404              MOV     A,#04H
+00EB F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 137
+00EC 8006              SJMP    ?C0013
+                                           ; SOURCE LINE # 139
+00EE         ?C0016:
+                                           ; SOURCE LINE # 140
+00EE 9049D9            MOV     DPTR,#049D9H
+00F1 7401              MOV     A,#01H
+00F3 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 141
+00F4         ?C0013:
+                                           ; SOURCE LINE # 144
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 19  
+
+00F4 9044C1            MOV     DPTR,#044C1H
+00F7 7480              MOV     A,#080H
+00F9 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 145
+                                           ; SOURCE LINE # 146
+00FA         ?C0001:
+                                           ; SOURCE LINE # 148
+00FA 900000      R     MOV     DPTR,#errStatus
+00FD E0                MOVX    A,@DPTR
+00FE FF                MOV     R7,A
+                                           ; SOURCE LINE # 149
+00FF         ?C0017:
+00FF 22                RET     
+             ; FUNCTION _I2CM_MasterWriteBuf (END)
+
+             ; FUNCTION _I2CM_MasterReadBuf (BEGIN)
+                                           ; SOURCE LINE # 196
+0000 900000      R     MOV     DPTR,#slaveAddress
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+0005 900000      R     MOV     DPTR,#rdData
+0008 120000      E     LCALL   ?C?PSTXDATA
+                                           ; SOURCE LINE # 198
+                                           ; SOURCE LINE # 201
+000B 900000      R     MOV     DPTR,#errStatus
+000E 7402              MOV     A,#02H
+0010 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 203
+0011 7B00              MOV     R3,#00H
+0013 7A00              MOV     R2,#00H
+0015 7900              MOV     R1,#00H
+0017 C003              PUSH    AR3
+0019 C002              PUSH    AR2
+001B C001              PUSH    AR1
+001D 900000      R     MOV     DPTR,#rdData
+0020 120000      E     LCALL   ?C?PLDXDATA
+0023 D082              POP     DPL
+0025 D083              POP     DPH
+0027 D0E0              POP     ACC
+0029 6B                XRL     A,R3
+002A 7008              JNZ     ?C0096
+002C E9                MOV     A,R1
+002D 6582              XRL     A,DPL
+002F 7003              JNZ     ?C0096
+0031 EA                MOV     A,R2
+0032 6583              XRL     A,DPH
+0034         ?C0096:
+0034 7003              JNZ     $ + 5H
+0036 020000      R     LJMP    ?C0018
+                                           ; SOURCE LINE # 204
+                                           ; SOURCE LINE # 206
+0039 900000      E     MOV     DPTR,#I2CM_state
+003C E0                MOVX    A,@DPTR
+003D FF                MOV     R7,A
+003E EF                MOV     A,R7
+003F B4101E            CJNE    A,#010H,?C0019
+                                           ; SOURCE LINE # 207
+                                           ; SOURCE LINE # 209
+0042 9049D9            MOV     DPTR,#049D9H
+0045 E0                MOVX    A,@DPTR
+0046 FF                MOV     R7,A
+0047 EF                MOV     A,R7
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 20  
+
+0048 5408              ANL     A,#08H
+004A FF                MOV     R7,A
+004B 7E00              MOV     R6,#00H
+004D EF                MOV     A,R7
+004E 4E                ORL     A,R6
+004F 7007              JNZ     ?C0020
+                                           ; SOURCE LINE # 210
+                                           ; SOURCE LINE # 211
+0051 900000      R     MOV     DPTR,#errStatus
+0054 E4                CLR     A
+0055 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 212
+0056 802A              SJMP    ?C0022
+0058         ?C0020:
+                                           ; SOURCE LINE # 214
+                                           ; SOURCE LINE # 215
+0058 900000      R     MOV     DPTR,#errStatus
+005B 7401              MOV     A,#01H
+005D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 216
+                                           ; SOURCE LINE # 217
+005E 8022              SJMP    ?C0022
+0060         ?C0019:
+                                           ; SOURCE LINE # 218
+0060 900000      E     MOV     DPTR,#I2CM_state
+0063 E0                MOVX    A,@DPTR
+0064 FF                MOV     R7,A
+0065 EF                MOV     A,R7
+0066 B46019            CJNE    A,#060H,?C0022
+                                           ; SOURCE LINE # 219
+                                           ; SOURCE LINE # 221
+0069 900000      R     MOV     DPTR,#errStatus
+006C E4                CLR     A
+006D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 223
+006E 9044D9            MOV     DPTR,#044D9H
+0071 7480              MOV     A,#080H
+0073 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 224
+0074 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0077 E0                MOVX    A,@DPTR
+0078 FF                MOV     R7,A
+0079 EF                MOV     A,R7
+007A 54F7              ANL     A,#0F7H
+007C FF                MOV     R7,A
+007D 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0080 EF                MOV     A,R7
+0081 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 225
+                                           ; SOURCE LINE # 227
+                                           ; SOURCE LINE # 229
+0082         ?C0022:
+                                           ; SOURCE LINE # 231
+0082 900000      R     MOV     DPTR,#errStatus
+0085 E0                MOVX    A,@DPTR
+0086 FF                MOV     R7,A
+0087 EF                MOV     A,R7
+0088 7074              JNZ     ?C0018
+                                           ; SOURCE LINE # 232
+                                           ; SOURCE LINE # 234
+008A 900000      E     MOV     DPTR,#I2CM_state
+008D 7449              MOV     A,#049H
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 21  
+
+008F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 237
+0090 900000      R     MOV     DPTR,#I2CM_mstrRdBufIndex
+0093 E4                CLR     A
+0094 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 238
+0095 900000      R     MOV     DPTR,#cnt
+0098 E0                MOVX    A,@DPTR
+0099 FF                MOV     R7,A
+009A 900000      R     MOV     DPTR,#I2CM_mstrRdBufSize
+009D EF                MOV     A,R7
+009E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 239
+009F 900000      R     MOV     DPTR,#rdData
+00A2 120000      E     LCALL   ?C?PLDXDATA
+00A5 900000      R     MOV     DPTR,#I2CM_mstrRdBufPtr
+00A8 120000      E     LCALL   ?C?PSTXDATA
+                                           ; SOURCE LINE # 242
+00AB 900000      R     MOV     DPTR,#mode
+00AE E0                MOVX    A,@DPTR
+00AF FF                MOV     R7,A
+00B0 900000      R     MOV     DPTR,#I2CM_mstrControl
+00B3 EF                MOV     A,R7
+00B4 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 245
+00B5 900000      R     MOV     DPTR,#I2CM_mstrStatus
+00B8 E0                MOVX    A,@DPTR
+00B9 FF                MOV     R7,A
+00BA EF                MOV     A,R7
+00BB 54FE              ANL     A,#0FEH
+00BD FF                MOV     R7,A
+00BE 900000      R     MOV     DPTR,#I2CM_mstrStatus
+00C1 EF                MOV     A,R7
+00C2 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 248
+00C3 900000      R     MOV     DPTR,#slaveAddress
+00C6 E0                MOVX    A,@DPTR
+00C7 FF                MOV     R7,A
+00C8 EF                MOV     A,R7
+00C9 25E0              ADD     A,ACC
+00CB FF                MOV     R7,A
+00CC EF                MOV     A,R7
+00CD 4401              ORL     A,#01H
+00CF FF                MOV     R7,A
+00D0 9049D8            MOV     DPTR,#049D8H
+00D3 EF                MOV     A,R7
+00D4 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 251
+00D5 900000      R     MOV     DPTR,#mode
+00D8 E0                MOVX    A,@DPTR
+00D9 FF                MOV     R7,A
+00DA EF                MOV     A,R7
+00DB 5401              ANL     A,#01H
+00DD FF                MOV     R7,A
+00DE 7E00              MOV     R6,#00H
+00E0 EF                MOV     A,R7
+00E1 4E                ORL     A,R6
+00E2 600E              JZ      ?C0033
+                                           ; SOURCE LINE # 252
+                                           ; SOURCE LINE # 253
+00E4 9049D9            MOV     DPTR,#049D9H
+00E7 7412              MOV     A,#012H
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 22  
+
+00E9 F0                MOVX    @DPTR,A
+00EA 9049D7            MOV     DPTR,#049D7H
+00ED 7404              MOV     A,#04H
+00EF F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 254
+00F0 8006              SJMP    ?C0030
+                                           ; SOURCE LINE # 256
+00F2         ?C0033:
+                                           ; SOURCE LINE # 257
+00F2 9049D9            MOV     DPTR,#049D9H
+00F5 7401              MOV     A,#01H
+00F7 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 258
+00F8         ?C0030:
+                                           ; SOURCE LINE # 261
+00F8 9044C1            MOV     DPTR,#044C1H
+00FB 7480              MOV     A,#080H
+00FD F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 262
+                                           ; SOURCE LINE # 263
+00FE         ?C0018:
+                                           ; SOURCE LINE # 265
+00FE 900000      R     MOV     DPTR,#errStatus
+0101 E0                MOVX    A,@DPTR
+0102 FF                MOV     R7,A
+                                           ; SOURCE LINE # 266
+0103         ?C0034:
+0103 22                RET     
+             ; FUNCTION _I2CM_MasterReadBuf (END)
+
+             ; FUNCTION _I2CM_MasterSendStart (BEGIN)
+                                           ; SOURCE LINE # 295
+0000 900000      R     MOV     DPTR,#slaveAddress
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+0005 900000      R     MOV     DPTR,#R_nW
+0008 ED                MOV     A,R5
+0009 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 297
+                                           ; SOURCE LINE # 300
+000A 900000      R     MOV     DPTR,#errStatus
+000D 7402              MOV     A,#02H
+000F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 303
+0010 900000      E     MOV     DPTR,#I2CM_state
+0013 E0                MOVX    A,@DPTR
+0014 FF                MOV     R7,A
+0015 EF                MOV     A,R7
+0016 6410              XRL     A,#010H
+0018 6003              JZ      $ + 5H
+001A 020000      R     LJMP    ?C0035
+                                           ; SOURCE LINE # 304
+                                           ; SOURCE LINE # 306
+001D 9049D9            MOV     DPTR,#049D9H
+0020 E0                MOVX    A,@DPTR
+0021 FF                MOV     R7,A
+0022 EF                MOV     A,R7
+0023 5408              ANL     A,#08H
+0025 FF                MOV     R7,A
+0026 7E00              MOV     R6,#00H
+0028 EF                MOV     A,R7
+0029 4E                ORL     A,R6
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 23  
+
+002A 707D              JNZ     ?C0036
+                                           ; SOURCE LINE # 307
+                                           ; SOURCE LINE # 309
+002C 9044C9            MOV     DPTR,#044C9H
+002F 7480              MOV     A,#080H
+0031 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 312
+0032 900000      R     MOV     DPTR,#slaveAddress
+0035 E0                MOVX    A,@DPTR
+0036 FF                MOV     R7,A
+0037 EF                MOV     A,R7
+0038 25E0              ADD     A,ACC
+003A FF                MOV     R7,A
+003B 900000      R     MOV     DPTR,#slaveAddress
+003E EF                MOV     A,R7
+003F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 313
+0040 900000      R     MOV     DPTR,#R_nW
+0043 E0                MOVX    A,@DPTR
+0044 FF                MOV     R7,A
+0045 EF                MOV     A,R7
+0046 6016              JZ      ?C0037
+                                           ; SOURCE LINE # 314
+                                           ; SOURCE LINE # 315
+0048 900000      R     MOV     DPTR,#slaveAddress
+004B E0                MOVX    A,@DPTR
+004C FF                MOV     R7,A
+004D EF                MOV     A,R7
+004E 4401              ORL     A,#01H
+0050 FF                MOV     R7,A
+0051 900000      R     MOV     DPTR,#slaveAddress
+0054 EF                MOV     A,R7
+0055 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 316
+0056 900000      E     MOV     DPTR,#I2CM_state
+0059 7449              MOV     A,#049H
+005B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 317
+005C 8006              SJMP    ?C0038
+005E         ?C0037:
+                                           ; SOURCE LINE # 319
+                                           ; SOURCE LINE # 320
+005E 900000      E     MOV     DPTR,#I2CM_state
+0061 7445              MOV     A,#045H
+0063 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 321
+0064         ?C0038:
+                                           ; SOURCE LINE # 324
+0064 900000      R     MOV     DPTR,#slaveAddress
+0067 E0                MOVX    A,@DPTR
+0068 FF                MOV     R7,A
+0069 9049D8            MOV     DPTR,#049D8H
+006C EF                MOV     A,R7
+006D F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 325
+006E 9049D9            MOV     DPTR,#049D9H
+0071 7401              MOV     A,#01H
+0073 F0                MOVX    @DPTR,A
+0074         ?C0042:
+                                           ; SOURCE LINE # 328
+0074 9049D7            MOV     DPTR,#049D7H
+0077 E0                MOVX    A,@DPTR
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 24  
+
+0078 FF                MOV     R7,A
+0079 EF                MOV     A,R7
+007A 5401              ANL     A,#01H
+007C FF                MOV     R7,A
+007D 7E00              MOV     R6,#00H
+007F EF                MOV     A,R7
+0080 4E                ORL     A,R6
+0081 60F1              JZ      ?C0042
+                                           ; SOURCE LINE # 329
+                                           ; SOURCE LINE # 330
+0083         ?C0043:
+                                           ; SOURCE LINE # 356
+0083 9049D7            MOV     DPTR,#049D7H
+0086 E0                MOVX    A,@DPTR
+0087 FF                MOV     R7,A
+0088 EF                MOV     A,R7
+0089 540A              ANL     A,#0AH
+008B FF                MOV     R7,A
+008C 7E00              MOV     R6,#00H
+008E EF                MOV     A,R7
+008F 640A              XRL     A,#0AH
+0091 4E                ORL     A,R6
+0092 700E              JNZ     ?C0044
+                                           ; SOURCE LINE # 357
+                                           ; SOURCE LINE # 359
+0094 900000      E     MOV     DPTR,#I2CM_state
+0097 7410              MOV     A,#010H
+0099 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 360
+009A 900000      R     MOV     DPTR,#errStatus
+009D 7403              MOV     A,#03H
+009F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 361
+00A0 800D              SJMP    ?C0035
+00A2         ?C0044:
+                                           ; SOURCE LINE # 363
+                                           ; SOURCE LINE # 365
+00A2 900000      R     MOV     DPTR,#errStatus
+00A5 E4                CLR     A
+00A6 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 366
+                                           ; SOURCE LINE # 367
+00A7 8006              SJMP    ?C0035
+00A9         ?C0036:
+                                           ; SOURCE LINE # 369
+                                           ; SOURCE LINE # 370
+00A9 900000      R     MOV     DPTR,#errStatus
+00AC 7401              MOV     A,#01H
+00AE F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 371
+                                           ; SOURCE LINE # 372
+00AF         ?C0035:
+                                           ; SOURCE LINE # 374
+00AF 900000      R     MOV     DPTR,#errStatus
+00B2 E0                MOVX    A,@DPTR
+00B3 FF                MOV     R7,A
+                                           ; SOURCE LINE # 375
+00B4         ?C0047:
+00B4 22                RET     
+             ; FUNCTION _I2CM_MasterSendStart (END)
+
+             ; FUNCTION _I2CM_MasterSendRestart (BEGIN)
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 25  
+
+                                           ; SOURCE LINE # 404
+0000 900000      R     MOV     DPTR,#slaveAddress
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+0005 900000      R     MOV     DPTR,#R_nW
+0008 ED                MOV     A,R5
+0009 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 406
+                                           ; SOURCE LINE # 409
+000A 900000      R     MOV     DPTR,#errStatus
+000D 7402              MOV     A,#02H
+000F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 412
+0010 9049D9            MOV     DPTR,#049D9H
+0013 E0                MOVX    A,@DPTR
+0014 FF                MOV     R7,A
+0015 EF                MOV     A,R7
+0016 5404              ANL     A,#04H
+0018 FF                MOV     R7,A
+0019 7E00              MOV     R6,#00H
+001B EF                MOV     A,R7
+001C 4E                ORL     A,R6
+001D 607B              JZ      ?C0048
+                                           ; SOURCE LINE # 413
+                                           ; SOURCE LINE # 415
+001F 900000      R     MOV     DPTR,#slaveAddress
+0022 E0                MOVX    A,@DPTR
+0023 FF                MOV     R7,A
+0024 EF                MOV     A,R7
+0025 25E0              ADD     A,ACC
+0027 FF                MOV     R7,A
+0028 900000      R     MOV     DPTR,#slaveAddress
+002B EF                MOV     A,R7
+002C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 416
+002D 900000      R     MOV     DPTR,#R_nW
+0030 E0                MOVX    A,@DPTR
+0031 FF                MOV     R7,A
+0032 EF                MOV     A,R7
+0033 6016              JZ      ?C0049
+                                           ; SOURCE LINE # 417
+                                           ; SOURCE LINE # 418
+0035 900000      R     MOV     DPTR,#slaveAddress
+0038 E0                MOVX    A,@DPTR
+0039 FF                MOV     R7,A
+003A EF                MOV     A,R7
+003B 4401              ORL     A,#01H
+003D FF                MOV     R7,A
+003E 900000      R     MOV     DPTR,#slaveAddress
+0041 EF                MOV     A,R7
+0042 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 419
+0043 900000      E     MOV     DPTR,#I2CM_state
+0046 7449              MOV     A,#049H
+0048 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 420
+0049 8006              SJMP    ?C0050
+004B         ?C0049:
+                                           ; SOURCE LINE # 422
+                                           ; SOURCE LINE # 423
+004B 900000      E     MOV     DPTR,#I2CM_state
+004E 7445              MOV     A,#045H
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 26  
+
+0050 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 424
+0051         ?C0050:
+                                           ; SOURCE LINE # 427
+0051 900000      R     MOV     DPTR,#slaveAddress
+0054 E0                MOVX    A,@DPTR
+0055 FF                MOV     R7,A
+0056 9049D8            MOV     DPTR,#049D8H
+0059 EF                MOV     A,R7
+005A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 428
+005B 9049D9            MOV     DPTR,#049D9H
+005E 7412              MOV     A,#012H
+0060 F0                MOVX    @DPTR,A
+0061 9049D7            MOV     DPTR,#049D7H
+0064 7404              MOV     A,#04H
+0066 F0                MOVX    @DPTR,A
+0067         ?C0054:
+                                           ; SOURCE LINE # 431
+0067 9049D7            MOV     DPTR,#049D7H
+006A E0                MOVX    A,@DPTR
+006B FF                MOV     R7,A
+006C EF                MOV     A,R7
+006D 5401              ANL     A,#01H
+006F FF                MOV     R7,A
+0070 7E00              MOV     R6,#00H
+0072 EF                MOV     A,R7
+0073 4E                ORL     A,R6
+0074 60F1              JZ      ?C0054
+                                           ; SOURCE LINE # 432
+                                           ; SOURCE LINE # 433
+0076         ?C0055:
+                                           ; SOURCE LINE # 447
+0076 9049D7            MOV     DPTR,#049D7H
+0079 E0                MOVX    A,@DPTR
+007A FF                MOV     R7,A
+007B EF                MOV     A,R7
+007C 540A              ANL     A,#0AH
+007E FF                MOV     R7,A
+007F 7E00              MOV     R6,#00H
+0081 EF                MOV     A,R7
+0082 640A              XRL     A,#0AH
+0084 4E                ORL     A,R6
+0085 700E              JNZ     ?C0056
+                                           ; SOURCE LINE # 448
+                                           ; SOURCE LINE # 450
+0087 900000      E     MOV     DPTR,#I2CM_state
+008A 7410              MOV     A,#010H
+008C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 451
+008D 900000      R     MOV     DPTR,#errStatus
+0090 7403              MOV     A,#03H
+0092 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 452
+0093 8005              SJMP    ?C0048
+0095         ?C0056:
+                                           ; SOURCE LINE # 454
+                                           ; SOURCE LINE # 456
+0095 900000      R     MOV     DPTR,#errStatus
+0098 E4                CLR     A
+0099 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 457
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 27  
+
+                                           ; SOURCE LINE # 458
+009A         ?C0048:
+                                           ; SOURCE LINE # 460
+009A 900000      R     MOV     DPTR,#errStatus
+009D E0                MOVX    A,@DPTR
+009E FF                MOV     R7,A
+                                           ; SOURCE LINE # 461
+009F         ?C0058:
+009F 22                RET     
+             ; FUNCTION _I2CM_MasterSendRestart (END)
+
+             ; FUNCTION I2CM_MasterSendStop (BEGIN)
+                                           ; SOURCE LINE # 490
+                                           ; SOURCE LINE # 491
+                                           ; SOURCE LINE # 494
+0000 900000      R     MOV     DPTR,#errStatus
+0003 7402              MOV     A,#02H
+0005 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 497
+0006 9049D9            MOV     DPTR,#049D9H
+0009 E0                MOVX    A,@DPTR
+000A FF                MOV     R7,A
+000B EF                MOV     A,R7
+000C 5404              ANL     A,#04H
+000E FF                MOV     R7,A
+000F 7E00              MOV     R6,#00H
+0011 EF                MOV     A,R7
+0012 4E                ORL     A,R6
+0013 6026              JZ      ?C0059
+                                           ; SOURCE LINE # 498
+                                           ; SOURCE LINE # 499
+0015 9049D9            MOV     DPTR,#049D9H
+0018 7410              MOV     A,#010H
+001A F0                MOVX    @DPTR,A
+001B 9049D7            MOV     DPTR,#049D7H
+001E 7404              MOV     A,#04H
+0020 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 500
+0021 900000      E     MOV     DPTR,#I2CM_state
+0024 7410              MOV     A,#010H
+0026 F0                MOVX    @DPTR,A
+0027         ?C0063:
+                                           ; SOURCE LINE # 503
+0027 9049D7            MOV     DPTR,#049D7H
+002A E0                MOVX    A,@DPTR
+002B FF                MOV     R7,A
+002C EF                MOV     A,R7
+002D 5421              ANL     A,#021H
+002F FF                MOV     R7,A
+0030 7E00              MOV     R6,#00H
+0032 EF                MOV     A,R7
+0033 4E                ORL     A,R6
+0034 60F1              JZ      ?C0063
+                                           ; SOURCE LINE # 504
+                                           ; SOURCE LINE # 505
+0036         ?C0064:
+                                           ; SOURCE LINE # 507
+0036 900000      R     MOV     DPTR,#errStatus
+0039 E4                CLR     A
+003A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 518
+003B         ?C0059:
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 28  
+
+                                           ; SOURCE LINE # 520
+003B 900000      R     MOV     DPTR,#errStatus
+003E E0                MOVX    A,@DPTR
+003F FF                MOV     R7,A
+                                           ; SOURCE LINE # 521
+0040         ?C0065:
+0040 22                RET     
+             ; FUNCTION I2CM_MasterSendStop (END)
+
+             ; FUNCTION _I2CM_MasterWriteByte (BEGIN)
+                                           ; SOURCE LINE # 548
+0000 900000      R     MOV     DPTR,#theByte
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 549
+                                           ; SOURCE LINE # 552
+0005 900000      R     MOV     DPTR,#errStatus
+0008 7402              MOV     A,#02H
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 555
+000B 9049D9            MOV     DPTR,#049D9H
+000E E0                MOVX    A,@DPTR
+000F FF                MOV     R7,A
+0010 EF                MOV     A,R7
+0011 5404              ANL     A,#04H
+0013 FF                MOV     R7,A
+0014 7E00              MOV     R6,#00H
+0016 EF                MOV     A,R7
+0017 4E                ORL     A,R6
+0018 604D              JZ      ?C0066
+                                           ; SOURCE LINE # 556
+                                           ; SOURCE LINE # 557
+001A 900000      R     MOV     DPTR,#theByte
+001D E0                MOVX    A,@DPTR
+001E FF                MOV     R7,A
+001F 9049D8            MOV     DPTR,#049D8H
+0022 EF                MOV     A,R7
+0023 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 558
+0024 9049D7            MOV     DPTR,#049D7H
+0027 7404              MOV     A,#04H
+0029 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 559
+002A 900000      E     MOV     DPTR,#I2CM_state
+002D 7446              MOV     A,#046H
+002F F0                MOVX    @DPTR,A
+0030         ?C0070:
+                                           ; SOURCE LINE # 562
+0030 9049D7            MOV     DPTR,#049D7H
+0033 E0                MOVX    A,@DPTR
+0034 FF                MOV     R7,A
+0035 EF                MOV     A,R7
+0036 5401              ANL     A,#01H
+0038 FF                MOV     R7,A
+0039 7E00              MOV     R6,#00H
+003B EF                MOV     A,R7
+003C 4E                ORL     A,R6
+003D 60F1              JZ      ?C0070
+                                           ; SOURCE LINE # 563
+                                           ; SOURCE LINE # 564
+003F         ?C0071:
+                                           ; SOURCE LINE # 579
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 29  
+
+003F 9049D7            MOV     DPTR,#049D7H
+0042 E0                MOVX    A,@DPTR
+0043 FF                MOV     R7,A
+0044 EF                MOV     A,R7
+0045 5402              ANL     A,#02H
+0047 FF                MOV     R7,A
+0048 7E00              MOV     R6,#00H
+004A EF                MOV     A,R7
+004B 4E                ORL     A,R6
+004C 700D              JNZ     ?C0072
+                                           ; SOURCE LINE # 580
+                                           ; SOURCE LINE # 581
+004E 900000      E     MOV     DPTR,#I2CM_state
+0051 7460              MOV     A,#060H
+0053 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 582
+0054 900000      R     MOV     DPTR,#errStatus
+0057 E4                CLR     A
+0058 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 583
+0059 800C              SJMP    ?C0066
+005B         ?C0072:
+                                           ; SOURCE LINE # 585
+                                           ; SOURCE LINE # 586
+005B 900000      E     MOV     DPTR,#I2CM_state
+005E 7460              MOV     A,#060H
+0060 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 587
+0061 900000      R     MOV     DPTR,#errStatus
+0064 7403              MOV     A,#03H
+0066 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 588
+                                           ; SOURCE LINE # 589
+0067         ?C0066:
+                                           ; SOURCE LINE # 591
+0067 900000      R     MOV     DPTR,#errStatus
+006A E0                MOVX    A,@DPTR
+006B FF                MOV     R7,A
+                                           ; SOURCE LINE # 592
+006C         ?C0074:
+006C 22                RET     
+             ; FUNCTION _I2CM_MasterWriteByte (END)
+
+             ; FUNCTION _I2CM_MasterReadByte (BEGIN)
+                                           ; SOURCE LINE # 623
+0000 900000      R     MOV     DPTR,#acknNak
+0003 EF                MOV     A,R7
+0004 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 624
+                                           ; SOURCE LINE # 627
+0005 900000      R     MOV     DPTR,#theByte
+0008 E4                CLR     A
+0009 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 630
+000A 9049D9            MOV     DPTR,#049D9H
+000D E0                MOVX    A,@DPTR
+000E FF                MOV     R7,A
+000F EF                MOV     A,R7
+0010 5404              ANL     A,#04H
+0012 FF                MOV     R7,A
+0013 7E00              MOV     R6,#00H
+0015 EF                MOV     A,R7
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 30  
+
+0016 4E                ORL     A,R6
+0017 6043              JZ      ?C0075
+                                           ; SOURCE LINE # 631
+                                           ; SOURCE LINE # 635
+0019 900000      E     MOV     DPTR,#I2CM_state
+001C E0                MOVX    A,@DPTR
+001D FF                MOV     R7,A
+001E EF                MOV     A,R7
+001F B4490B            CJNE    A,#049H,?C0080
+                                           ; SOURCE LINE # 636
+                                           ; SOURCE LINE # 637
+0022 9049D7            MOV     DPTR,#049D7H
+0025 E4                CLR     A
+0026 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 638
+0027 900000      E     MOV     DPTR,#I2CM_state
+002A 744A              MOV     A,#04AH
+002C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 639
+002D         ?C0080:
+                                           ; SOURCE LINE # 642
+002D 9049D7            MOV     DPTR,#049D7H
+0030 E0                MOVX    A,@DPTR
+0031 FF                MOV     R7,A
+0032 EF                MOV     A,R7
+0033 5401              ANL     A,#01H
+0035 FF                MOV     R7,A
+0036 7E00              MOV     R6,#00H
+0038 EF                MOV     A,R7
+0039 4E                ORL     A,R6
+003A 60F1              JZ      ?C0080
+                                           ; SOURCE LINE # 643
+                                           ; SOURCE LINE # 644
+003C         ?C0081:
+                                           ; SOURCE LINE # 646
+003C 9049D8            MOV     DPTR,#049D8H
+003F E0                MOVX    A,@DPTR
+0040 FF                MOV     R7,A
+0041 900000      R     MOV     DPTR,#theByte
+0044 EF                MOV     A,R7
+0045 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 652
+0046 900000      R     MOV     DPTR,#acknNak
+0049 E0                MOVX    A,@DPTR
+004A FF                MOV     R7,A
+004B EF                MOV     A,R7
+004C 6008              JZ      ?C0082
+                                           ; SOURCE LINE # 653
+                                           ; SOURCE LINE # 654
+004E 9049D7            MOV     DPTR,#049D7H
+0051 7410              MOV     A,#010H
+0053 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 655
+0054 8006              SJMP    ?C0075
+0056         ?C0082:
+                                           ; SOURCE LINE # 657
+                                           ; SOURCE LINE # 658
+0056 900000      E     MOV     DPTR,#I2CM_state
+0059 7460              MOV     A,#060H
+005B F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 659
+                                           ; SOURCE LINE # 660
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 31  
+
+005C         ?C0075:
+                                           ; SOURCE LINE # 662
+005C 900000      R     MOV     DPTR,#theByte
+005F E0                MOVX    A,@DPTR
+0060 FF                MOV     R7,A
+                                           ; SOURCE LINE # 663
+0061         ?C0087:
+0061 22                RET     
+             ; FUNCTION _I2CM_MasterReadByte (END)
+
+             ; FUNCTION I2CM_MasterStatus (BEGIN)
+                                           ; SOURCE LINE # 684
+                                           ; SOURCE LINE # 685
+                                           ; SOURCE LINE # 688
+0000 9044C9            MOV     DPTR,#044C9H
+0003 7480              MOV     A,#080H
+0005 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 691
+0006 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0009 E0                MOVX    A,@DPTR
+000A FF                MOV     R7,A
+000B 900000      R     MOV     DPTR,#status
+000E EF                MOV     A,R7
+000F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 693
+0010 900000      E     MOV     DPTR,#I2CM_state
+0013 E0                MOVX    A,@DPTR
+0014 FF                MOV     R7,A
+0015 EF                MOV     A,R7
+0016 5440              ANL     A,#040H
+0018 FF                MOV     R7,A
+0019 7E00              MOV     R6,#00H
+001B EF                MOV     A,R7
+001C 4E                ORL     A,R6
+001D 600E              JZ      ?C0088
+                                           ; SOURCE LINE # 694
+                                           ; SOURCE LINE # 696
+001F 900000      R     MOV     DPTR,#status
+0022 E0                MOVX    A,@DPTR
+0023 FF                MOV     R7,A
+0024 EF                MOV     A,R7
+0025 4404              ORL     A,#04H
+0027 FF                MOV     R7,A
+0028 900000      R     MOV     DPTR,#status
+002B EF                MOV     A,R7
+002C F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 697
+002D         ?C0088:
+                                           ; SOURCE LINE # 699
+002D 9044C1            MOV     DPTR,#044C1H
+0030 7480              MOV     A,#080H
+0032 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 701
+0033 900000      R     MOV     DPTR,#status
+0036 E0                MOVX    A,@DPTR
+0037 FF                MOV     R7,A
+                                           ; SOURCE LINE # 702
+0038         ?C0089:
+0038 22                RET     
+             ; FUNCTION I2CM_MasterStatus (END)
+
+             ; FUNCTION I2CM_MasterClearStatus (BEGIN)
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 32  
+
+                                           ; SOURCE LINE # 726
+                                           ; SOURCE LINE # 727
+                                           ; SOURCE LINE # 730
+0000 9044C9            MOV     DPTR,#044C9H
+0003 7480              MOV     A,#080H
+0005 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 733
+0006 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0009 E0                MOVX    A,@DPTR
+000A FF                MOV     R7,A
+000B 900000      R     MOV     DPTR,#status
+000E EF                MOV     A,R7
+000F F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 734
+0010 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0013 E4                CLR     A
+0014 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 736
+0015 9044C1            MOV     DPTR,#044C1H
+0018 7480              MOV     A,#080H
+001A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 738
+001B 900000      R     MOV     DPTR,#status
+001E E0                MOVX    A,@DPTR
+001F FF                MOV     R7,A
+                                           ; SOURCE LINE # 739
+0020         ?C0090:
+0020 22                RET     
+             ; FUNCTION I2CM_MasterClearStatus (END)
+
+             ; FUNCTION I2CM_MasterGetReadBufSize (BEGIN)
+                                           ; SOURCE LINE # 762
+                                           ; SOURCE LINE # 763
+                                           ; SOURCE LINE # 764
+0000 900000      R     MOV     DPTR,#I2CM_mstrRdBufIndex
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+                                           ; SOURCE LINE # 765
+0005         ?C0091:
+0005 22                RET     
+             ; FUNCTION I2CM_MasterGetReadBufSize (END)
+
+             ; FUNCTION I2CM_MasterGetWriteBufSize (BEGIN)
+                                           ; SOURCE LINE # 788
+                                           ; SOURCE LINE # 789
+                                           ; SOURCE LINE # 790
+0000 900000      R     MOV     DPTR,#I2CM_mstrWrBufIndex
+0003 E0                MOVX    A,@DPTR
+0004 FF                MOV     R7,A
+                                           ; SOURCE LINE # 791
+0005         ?C0092:
+0005 22                RET     
+             ; FUNCTION I2CM_MasterGetWriteBufSize (END)
+
+             ; FUNCTION I2CM_MasterClearReadBuf (BEGIN)
+                                           ; SOURCE LINE # 817
+                                           ; SOURCE LINE # 818
+                                           ; SOURCE LINE # 819
+0000 9044C9            MOV     DPTR,#044C9H
+0003 7480              MOV     A,#080H
+0005 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 821
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 33  
+
+0006 900000      R     MOV     DPTR,#I2CM_mstrRdBufIndex
+0009 E4                CLR     A
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 822
+000B 900000      R     MOV     DPTR,#I2CM_mstrStatus
+000E E0                MOVX    A,@DPTR
+000F FF                MOV     R7,A
+0010 EF                MOV     A,R7
+0011 54FE              ANL     A,#0FEH
+0013 FF                MOV     R7,A
+0014 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0017 EF                MOV     A,R7
+0018 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 824
+0019 9044C1            MOV     DPTR,#044C1H
+001C 7480              MOV     A,#080H
+001E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 825
+001F 22                RET     
+             ; FUNCTION I2CM_MasterClearReadBuf (END)
+
+             ; FUNCTION I2CM_MasterClearWriteBuf (BEGIN)
+                                           ; SOURCE LINE # 851
+                                           ; SOURCE LINE # 852
+                                           ; SOURCE LINE # 853
+0000 9044C9            MOV     DPTR,#044C9H
+0003 7480              MOV     A,#080H
+0005 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 855
+0006 900000      R     MOV     DPTR,#I2CM_mstrWrBufIndex
+0009 E4                CLR     A
+000A F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 856
+000B 900000      R     MOV     DPTR,#I2CM_mstrStatus
+000E E0                MOVX    A,@DPTR
+000F FF                MOV     R7,A
+0010 EF                MOV     A,R7
+0011 54FD              ANL     A,#0FDH
+0013 FF                MOV     R7,A
+0014 900000      R     MOV     DPTR,#I2CM_mstrStatus
+0017 EF                MOV     A,R7
+0018 F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 858
+0019 9044C1            MOV     DPTR,#044C1H
+001C 7480              MOV     A,#080H
+001E F0                MOVX    @DPTR,A
+                                           ; SOURCE LINE # 859
+001F 22                RET     
+             ; FUNCTION I2CM_MasterClearWriteBuf (END)
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =   1295    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =     12      27
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+   EDATA SIZE       =   ----    ----
+   HDATA SIZE       =   ----    ----
+C51 COMPILER V9.51   I2CM_MASTER                                                           10/28/2016 13:50:57 PAGE 34  
+
+   XDATA CONST SIZE =   ----    ----
+   FAR CONST SIZE   =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

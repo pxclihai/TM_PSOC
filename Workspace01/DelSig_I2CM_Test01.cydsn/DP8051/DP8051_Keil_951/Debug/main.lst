@@ -1,0 +1,118 @@
+C51 COMPILER V9.51   MAIN                                                                  10/28/2016 13:45:18 PAGE 1   
+
+
+C51 COMPILER V9.51, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN .\DP8051\DP8051_Keil_951\Debug\main.obj
+COMPILER INVOKED BY: C:\Program Files (x86)\Cypress\PSoC Creator\3.3\PSoC Creator\import\keil\pk51\9.51\C51\BIN\c51.exe 
+                    -.\main.c NOIV LARGE MODDP2 OMF2 VB(1) NOIP INCDIR(.,Generated_Source\PSoC3) FF(3) DB WL(2) PR(.\DP8051\DP8051_Keil_951\D
+                    -ebug/main.lst) CD OT(2,SIZE) OJ(.\DP8051\DP8051_Keil_951\Debug\main.obj)
+
+line level    source
+
+   1          /*******************************************************************************
+   2          * File Name: main.c
+   3          *
+   4          * Version: 1.0
+   5          *
+   6          * Description:
+   7          *  This is the test project for the 8-ch DelSig ADC and I2C master example   
+   8          *  project.
+   9          *  
+  10          * Parameters used:
+  11          *  I2C slave
+  12          *       Address                         8
+  13          *   Implementation              Fixed function
+  14          *   Data rate                   100kbps
+  15          *       Address decode          Hardware
+  16          *   SDA SCL config      Open drain, drives low
+  17          *   Pull-up resistors   2.67k each 
+  18          *
+  19          ********************************************************************************
+  20          * Copyright 2012, Cypress Semiconductor Corporation. All rights reserved.
+  21          * This software is owned by Cypress Semiconductor Corporation and is protected
+  22          * by and subject to worldwide patent and copyright laws and treaties.
+  23          * Therefore, you may use this software only as provided in the license agreement
+  24          * accompanying the software package from which you obtained this software.
+  25          * CYPRESS AND ITS SUPPLIERS MAKE NO WARRANTY OF ANY KIND, EXPRESS OR IMPLIED,
+  26          * WITH REGARD TO THIS SOFTWARE, INCLUDING, BUT NOT LIMITED TO, NONINFRINGEMENT,
+  27          * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+  28          *******************************************************************************/
+  29          
+  30          #include <device.h>
+  31          
+  32          /* Set the write buffer length to be 16 bits or 2 bytes */
+  33          #define WR_BUFFER_SIZE          (2u)
+  34          
+  35          /*******************************************************************************
+  36          * Function Name: main
+  37          ********************************************************************************
+  38          * Summary:
+  39          *  Main function performs following functions:
+  40          *   1. Starts used components.
+  41          *   2. Waits for, then receives data sent by I2C master.
+  42          *   3. Displays this data on Character LCD.
+  43          *
+  44          * Parameters:
+  45          *  None.
+  46          *
+  47          * Return:
+  48          *  None.
+  49          *
+  50          *******************************************************************************/
+  51          int main()
+  52          {
+  53   1              uint8 wrBuf[WR_BUFFER_SIZE];
+C51 COMPILER V9.51   MAIN                                                                  10/28/2016 13:45:18 PAGE 2   
+
+  54   1              uint8 byteCount = 0u;
+  55   1      
+  56   1              /* Set up the write buffer for the I2C Slave */
+  57   1              I2CS_SlaveInitWriteBuf((uint8 *) wrBuf, WR_BUFFER_SIZE);
+*** WARNING C206 IN LINE 57 OF .\main.c: 'I2CS_SlaveInitWriteBuf': missing function-prototype
+*** ERROR C267 IN LINE 57 OF .\main.c: 'I2CS_SlaveInitWriteBuf': requires ANSI-style prototype
+  58   1              
+  59   1              I2CS_Start();
+  60   1      
+  61   1              /* The LCD will display the values read from ADC in hex */
+  62   1              LCD_Char_Start();
+  63   1              
+  64   1              /* Enable global interrupts - required for I2C */
+  65   1              CyGlobalIntEnable;
+  66   1              
+  67   1          for(;;)
+  68   1          {
+  69   2                  /* Check if the write from the master is complete */
+  70   2                      if(I2CS_SlaveStatus() & I2CS_SSTAT_WR_CMPLT)
+  71   2                      {
+  72   3                              byteCount = I2CS_SlaveGetWriteBufSize();
+  73   3                      
+  74   3                              I2CS_SlaveClearWriteStatus();
+  75   3                              I2CS_SlaveClearWriteBuf();
+  76   3                              
+  77   3                              /* If both bytes are received from master, display on LCD */
+  78   3                              if(byteCount == WR_BUFFER_SIZE)
+  79   3                              {
+  80   4                                      /* Read and display received data on the LCD and verify this is same as
+  81   4                                       * sent by master. 
+  82   4                                       */
+  83   4                                      LCD_Char_ClearDisplay();
+  84   4                                      LCD_Char_PrintString("0x");
+  85   4                                      LCD_Char_PrintInt8(wrBuf[0]);
+  86   4                                      LCD_Char_PrintInt8(wrBuf[1]);
+  87   4                              }
+  88   3                              
+  89   3                              else /* Wrong number of bytes read */
+  90   3                              {
+  91   4                                      /*  Indicate a read error and wait for next read */
+  92   4                                      LCD_Char_ClearDisplay();
+  93   4                                      LCD_Char_PrintString("I2C Error! ");
+  94   4                                      /* Place error handling code here */
+  95   4                              }
+  96   3                      }
+  97   2          } /* End forever loop */
+  98   1      } /* End main */
+  99          
+ 100          
+ 101          /* [] END OF FILE */
+
+C51 COMPILATION COMPLETE.  1 WARNING(S),  1 ERROR(S)

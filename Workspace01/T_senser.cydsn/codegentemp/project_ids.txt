@@ -1,0 +1,5 @@
+D:\robot\code\robot_T\Workspace01\T_senser.cydsn\T_senser.cyprj|4247b645-e5dd-455c-a0ff-89adc1534c6e
+C:\Program Files (x86)\Cypress\PSoC Creator\3.3\PSoC Creator\psoc\content\default\CyAnnotationLibrary\CyAnnotationLibrary.cylib\CyAnnotationLibrary.cyprj|df7bdc81-d61a-4fe1-9821-352dc80b2ea6
+C:\Program Files (x86)\Cypress\PSoC Creator\3.3\PSoC Creator\psoc\content\cycomponentlibraryupdates\CyComponentLibraryUpdates.cylib\CyComponentLibraryUpdates.cyprj|88a47e7b-f0fe-4ff9-a49b-9140eb453f81
+C:\Program Files (x86)\Cypress\PSoC Creator\3.3\PSoC Creator\psoc\content\cycomponentlibrary\CyComponentLibrary.cylib\CyComponentLibrary.cyprj|b8e73115-156f-4266-b54f-c77d464781e9
+C:\Program Files (x86)\Cypress\PSoC Creator\3.3\PSoC Creator\psoc\content\cyprimitives\CyPrimitives.cylib\CyPrimitives.cyprj|82906209-0b57-4c5b-bd8c-79d46846a711

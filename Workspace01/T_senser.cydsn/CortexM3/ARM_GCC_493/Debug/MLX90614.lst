@@ -1,0 +1,928 @@
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 1
+
+
+   1              		.syntax unified
+   2              		.cpu cortex-m3
+   3              		.fpu softvfp
+   4              		.eabi_attribute 20, 1
+   5              		.eabi_attribute 21, 1
+   6              		.eabi_attribute 23, 3
+   7              		.eabi_attribute 24, 1
+   8              		.eabi_attribute 25, 1
+   9              		.eabi_attribute 26, 1
+  10              		.eabi_attribute 30, 1
+  11              		.eabi_attribute 34, 1
+  12              		.eabi_attribute 18, 4
+  13              		.thumb
+  14              		.file	"MLX90614.c"
+  15              		.text
+  16              	.Ltext0:
+  17              		.cfi_sections	.debug_frame
+  18              		.section	.text.mlx90614_read_in,"ax",%progbits
+  19              		.align	2
+  20              		.global	mlx90614_read_in
+  21              		.thumb
+  22              		.thumb_func
+  23              		.type	mlx90614_read_in, %function
+  24              	mlx90614_read_in:
+  25              	.LFB63:
+  26              		.file 1 ".\\MLX90614.c"
+   1:.\MLX90614.c  **** #include <stdio.h>
+   2:.\MLX90614.c  **** #include "i2c_core.h"
+   3:.\MLX90614.c  **** #include "MLX90614.h"
+   4:.\MLX90614.c  **** 
+   5:.\MLX90614.c  **** int mlx90614_read_in( unsigned char addr )
+   6:.\MLX90614.c  **** {
+  27              		.loc 1 6 0
+  28              		.cfi_startproc
+  29              		@ args = 0, pretend = 0, frame = 8
+  30              		@ frame_needed = 0, uses_anonymous_args = 0
+  31              	.LVL0:
+  32 0000 00B5     		push	{lr}
+  33              		.cfi_def_cfa_offset 4
+  34              		.cfi_offset 14, -4
+  35 0002 83B0     		sub	sp, sp, #12
+  36              		.cfi_def_cfa_offset 16
+   7:.\MLX90614.c  **** 		unsigned char I2CData[2];
+   8:.\MLX90614.c  **** 		int temp;
+   9:.\MLX90614.c  **** 		int size;
+  10:.\MLX90614.c  **** 		
+  11:.\MLX90614.c  **** 		size = I2C_Read( addr, 6, I2CData, 2 );
+  37              		.loc 1 11 0
+  38 0004 0621     		movs	r1, #6
+  39 0006 01AA     		add	r2, sp, #4
+  40 0008 0223     		movs	r3, #2
+  41 000a FFF7FEFF 		bl	I2C_Read
+  42              	.LVL1:
+  12:.\MLX90614.c  **** 		
+  13:.\MLX90614.c  **** 		if( size != 2 )
+  43              		.loc 1 13 0
+  44 000e 0228     		cmp	r0, #2
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 2
+
+
+  45 0010 0AD1     		bne	.L3
+  14:.\MLX90614.c  **** 		{
+  15:.\MLX90614.c  **** 			//	printf("mlx90614 read failed!\r\n");
+  16:.\MLX90614.c  **** 				return -1;
+  17:.\MLX90614.c  **** 		}
+  18:.\MLX90614.c  **** 		temp = (I2CData[1] << 8 | I2CData[0])*2;
+  46              		.loc 1 18 0
+  47 0012 9DF80500 		ldrb	r0, [sp, #5]	@ zero_extendqisi2
+  48              	.LVL2:
+  49 0016 9DF80430 		ldrb	r3, [sp, #4]	@ zero_extendqisi2
+  50 001a 43EA0020 		orr	r0, r3, r0, lsl #8
+  51 001e 4000     		lsls	r0, r0, #1
+  52              	.LVL3:
+  19:.\MLX90614.c  **** 		temp -= 27315;
+  53              		.loc 1 19 0
+  54 0020 A0F5D540 		sub	r0, r0, #27264
+  55              	.LVL4:
+  56 0024 3338     		subs	r0, r0, #51
+  57              	.LVL5:
+  20:.\MLX90614.c  **** 	//    UART_net_PutArray(I2CData,2);
+  21:.\MLX90614.c  **** 		return temp;
+  58              		.loc 1 21 0
+  59 0026 01E0     		b	.L2
+  60              	.LVL6:
+  61              	.L3:
+  16:.\MLX90614.c  **** 		}
+  62              		.loc 1 16 0
+  63 0028 4FF0FF30 		mov	r0, #-1
+  64              	.LVL7:
+  65              	.L2:
+  22:.\MLX90614.c  **** }
+  66              		.loc 1 22 0
+  67 002c 03B0     		add	sp, sp, #12
+  68              		.cfi_def_cfa_offset 4
+  69              		@ sp needed
+  70 002e 5DF804FB 		ldr	pc, [sp], #4
+  71              		.cfi_endproc
+  72              	.LFE63:
+  73              		.size	mlx90614_read_in, .-mlx90614_read_in
+  74 0032 00BF     		.section	.text.mlx90614_read_out,"ax",%progbits
+  75              		.align	2
+  76              		.global	mlx90614_read_out
+  77              		.thumb
+  78              		.thumb_func
+  79              		.type	mlx90614_read_out, %function
+  80              	mlx90614_read_out:
+  81              	.LFB64:
+  23:.\MLX90614.c  **** int mlx90614_read_out( unsigned char addr )
+  24:.\MLX90614.c  **** {
+  82              		.loc 1 24 0
+  83              		.cfi_startproc
+  84              		@ args = 0, pretend = 0, frame = 8
+  85              		@ frame_needed = 0, uses_anonymous_args = 0
+  86              	.LVL8:
+  87 0000 00B5     		push	{lr}
+  88              		.cfi_def_cfa_offset 4
+  89              		.cfi_offset 14, -4
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 3
+
+
+  90 0002 83B0     		sub	sp, sp, #12
+  91              		.cfi_def_cfa_offset 16
+  25:.\MLX90614.c  **** 		unsigned char I2CData[2];
+  26:.\MLX90614.c  **** 		int size;
+  27:.\MLX90614.c  **** 		int temp;
+  28:.\MLX90614.c  **** 		
+  29:.\MLX90614.c  **** 		size = I2C_Read( addr, 7, I2CData, 2 );
+  92              		.loc 1 29 0
+  93 0004 0721     		movs	r1, #7
+  94 0006 01AA     		add	r2, sp, #4
+  95 0008 0223     		movs	r3, #2
+  96 000a FFF7FEFF 		bl	I2C_Read
+  97              	.LVL9:
+  30:.\MLX90614.c  **** 		
+  31:.\MLX90614.c  **** 		if( size != 2 )
+  98              		.loc 1 31 0
+  99 000e 0228     		cmp	r0, #2
+ 100 0010 0AD1     		bne	.L7
+  32:.\MLX90614.c  **** 		{
+  33:.\MLX90614.c  **** 			//	printf("mlx90614 read failed!\r\n");
+  34:.\MLX90614.c  **** 				return -1;
+  35:.\MLX90614.c  **** 		}
+  36:.\MLX90614.c  **** 		temp = (I2CData[1] << 8 | I2CData[0])*2;
+ 101              		.loc 1 36 0
+ 102 0012 9DF80500 		ldrb	r0, [sp, #5]	@ zero_extendqisi2
+ 103              	.LVL10:
+ 104 0016 9DF80430 		ldrb	r3, [sp, #4]	@ zero_extendqisi2
+ 105 001a 43EA0020 		orr	r0, r3, r0, lsl #8
+ 106 001e 4000     		lsls	r0, r0, #1
+ 107              	.LVL11:
+  37:.\MLX90614.c  **** 		temp -= 27315;
+ 108              		.loc 1 37 0
+ 109 0020 A0F5D540 		sub	r0, r0, #27264
+ 110              	.LVL12:
+ 111 0024 3338     		subs	r0, r0, #51
+ 112              	.LVL13:
+  38:.\MLX90614.c  **** 		
+  39:.\MLX90614.c  **** 		return temp;
+ 113              		.loc 1 39 0
+ 114 0026 01E0     		b	.L6
+ 115              	.LVL14:
+ 116              	.L7:
+  34:.\MLX90614.c  **** 		}
+ 117              		.loc 1 34 0
+ 118 0028 4FF0FF30 		mov	r0, #-1
+ 119              	.LVL15:
+ 120              	.L6:
+  40:.\MLX90614.c  **** }
+ 121              		.loc 1 40 0
+ 122 002c 03B0     		add	sp, sp, #12
+ 123              		.cfi_def_cfa_offset 4
+ 124              		@ sp needed
+ 125 002e 5DF804FB 		ldr	pc, [sp], #4
+ 126              		.cfi_endproc
+ 127              	.LFE64:
+ 128              		.size	mlx90614_read_out, .-mlx90614_read_out
+ 129 0032 00BF     		.text
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 4
+
+
+ 130              	.Letext0:
+ 131              		.file 2 "c:\\program files (x86)\\cypress\\psoc creator\\3.3\\psoc creator\\import\\gnu\\arm\\4.9.
+ 132              		.file 3 "c:\\program files (x86)\\cypress\\psoc creator\\3.3\\psoc creator\\import\\gnu\\arm\\4.9.
+ 133              		.file 4 "Generated_Source\\PSoC5/core_cm3.h"
+ 134              		.file 5 ".\\i2c_core.h"
+ 135              		.section	.debug_info,"",%progbits
+ 136              	.Ldebug_info0:
+ 137 0000 BF010000 		.4byte	0x1bf
+ 138 0004 0400     		.2byte	0x4
+ 139 0006 00000000 		.4byte	.Ldebug_abbrev0
+ 140 000a 04       		.byte	0x4
+ 141 000b 01       		.uleb128 0x1
+ 142 000c 91000000 		.4byte	.LASF21
+ 143 0010 01       		.byte	0x1
+ 144 0011 84000000 		.4byte	.LASF22
+ 145 0015 1F010000 		.4byte	.LASF23
+ 146 0019 00000000 		.4byte	.Ldebug_ranges0+0
+ 147 001d 00000000 		.4byte	0
+ 148 0021 00000000 		.4byte	.Ldebug_line0
+ 149 0025 02       		.uleb128 0x2
+ 150 0026 01       		.byte	0x1
+ 151 0027 06       		.byte	0x6
+ 152 0028 80010000 		.4byte	.LASF0
+ 153 002c 02       		.uleb128 0x2
+ 154 002d 01       		.byte	0x1
+ 155 002e 08       		.byte	0x8
+ 156 002f 40000000 		.4byte	.LASF1
+ 157 0033 02       		.uleb128 0x2
+ 158 0034 02       		.byte	0x2
+ 159 0035 05       		.byte	0x5
+ 160 0036 A9010000 		.4byte	.LASF2
+ 161 003a 02       		.uleb128 0x2
+ 162 003b 02       		.byte	0x2
+ 163 003c 07       		.byte	0x7
+ 164 003d 0E000000 		.4byte	.LASF3
+ 165 0041 03       		.uleb128 0x3
+ 166 0042 99010000 		.4byte	.LASF11
+ 167 0046 02       		.byte	0x2
+ 168 0047 3F       		.byte	0x3f
+ 169 0048 4C000000 		.4byte	0x4c
+ 170 004c 02       		.uleb128 0x2
+ 171 004d 04       		.byte	0x4
+ 172 004e 05       		.byte	0x5
+ 173 004f 63010000 		.4byte	.LASF4
+ 174 0053 02       		.uleb128 0x2
+ 175 0054 04       		.byte	0x4
+ 176 0055 07       		.byte	0x7
+ 177 0056 5B000000 		.4byte	.LASF5
+ 178 005a 02       		.uleb128 0x2
+ 179 005b 08       		.byte	0x8
+ 180 005c 05       		.byte	0x5
+ 181 005d 00000000 		.4byte	.LASF6
+ 182 0061 02       		.uleb128 0x2
+ 183 0062 08       		.byte	0x8
+ 184 0063 07       		.byte	0x7
+ 185 0064 6D000000 		.4byte	.LASF7
+ 186 0068 04       		.uleb128 0x4
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 5
+
+
+ 187 0069 04       		.byte	0x4
+ 188 006a 05       		.byte	0x5
+ 189 006b 696E7400 		.ascii	"int\000"
+ 190 006f 02       		.uleb128 0x2
+ 191 0070 04       		.byte	0x4
+ 192 0071 07       		.byte	0x7
+ 193 0072 21000000 		.4byte	.LASF8
+ 194 0076 02       		.uleb128 0x2
+ 195 0077 04       		.byte	0x4
+ 196 0078 07       		.byte	0x7
+ 197 0079 C4010000 		.4byte	.LASF9
+ 198 007d 05       		.uleb128 0x5
+ 199 007e 04       		.byte	0x4
+ 200 007f 2C000000 		.4byte	0x2c
+ 201 0083 02       		.uleb128 0x2
+ 202 0084 01       		.byte	0x1
+ 203 0085 08       		.byte	0x8
+ 204 0086 59010000 		.4byte	.LASF10
+ 205 008a 03       		.uleb128 0x3
+ 206 008b 53000000 		.4byte	.LASF12
+ 207 008f 03       		.byte	0x3
+ 208 0090 2C       		.byte	0x2c
+ 209 0091 41000000 		.4byte	0x41
+ 210 0095 02       		.uleb128 0x2
+ 211 0096 04       		.byte	0x4
+ 212 0097 04       		.byte	0x4
+ 213 0098 A3010000 		.4byte	.LASF13
+ 214 009c 02       		.uleb128 0x2
+ 215 009d 08       		.byte	0x8
+ 216 009e 04       		.byte	0x4
+ 217 009f 6C010000 		.4byte	.LASF14
+ 218 00a3 06       		.uleb128 0x6
+ 219 00a4 B3010000 		.4byte	.LASF18
+ 220 00a8 01       		.byte	0x1
+ 221 00a9 05       		.byte	0x5
+ 222 00aa 68000000 		.4byte	0x68
+ 223 00ae 00000000 		.4byte	.LFB63
+ 224 00b2 32000000 		.4byte	.LFE63-.LFB63
+ 225 00b6 01       		.uleb128 0x1
+ 226 00b7 9C       		.byte	0x9c
+ 227 00b8 12010000 		.4byte	0x112
+ 228 00bc 07       		.uleb128 0x7
+ 229 00bd 5E010000 		.4byte	.LASF20
+ 230 00c1 01       		.byte	0x1
+ 231 00c2 05       		.byte	0x5
+ 232 00c3 2C000000 		.4byte	0x2c
+ 233 00c7 00000000 		.4byte	.LLST0
+ 234 00cb 08       		.uleb128 0x8
+ 235 00cc 91010000 		.4byte	.LASF15
+ 236 00d0 01       		.byte	0x1
+ 237 00d1 07       		.byte	0x7
+ 238 00d2 12010000 		.4byte	0x112
+ 239 00d6 02       		.uleb128 0x2
+ 240 00d7 91       		.byte	0x91
+ 241 00d8 74       		.sleb128 -12
+ 242 00d9 09       		.uleb128 0x9
+ 243 00da 4E000000 		.4byte	.LASF16
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 6
+
+
+ 244 00de 01       		.byte	0x1
+ 245 00df 08       		.byte	0x8
+ 246 00e0 68000000 		.4byte	0x68
+ 247 00e4 21000000 		.4byte	.LLST1
+ 248 00e8 09       		.uleb128 0x9
+ 249 00e9 8C010000 		.4byte	.LASF17
+ 250 00ed 01       		.byte	0x1
+ 251 00ee 09       		.byte	0x9
+ 252 00ef 68000000 		.4byte	0x68
+ 253 00f3 43000000 		.4byte	.LLST2
+ 254 00f7 0A       		.uleb128 0xa
+ 255 00f8 0E000000 		.4byte	.LVL1
+ 256 00fc A2010000 		.4byte	0x1a2
+ 257 0100 0B       		.uleb128 0xb
+ 258 0101 01       		.uleb128 0x1
+ 259 0102 53       		.byte	0x53
+ 260 0103 01       		.uleb128 0x1
+ 261 0104 32       		.byte	0x32
+ 262 0105 0B       		.uleb128 0xb
+ 263 0106 01       		.uleb128 0x1
+ 264 0107 52       		.byte	0x52
+ 265 0108 02       		.uleb128 0x2
+ 266 0109 91       		.byte	0x91
+ 267 010a 74       		.sleb128 -12
+ 268 010b 0B       		.uleb128 0xb
+ 269 010c 01       		.uleb128 0x1
+ 270 010d 51       		.byte	0x51
+ 271 010e 01       		.uleb128 0x1
+ 272 010f 36       		.byte	0x36
+ 273 0110 00       		.byte	0
+ 274 0111 00       		.byte	0
+ 275 0112 0C       		.uleb128 0xc
+ 276 0113 2C000000 		.4byte	0x2c
+ 277 0117 22010000 		.4byte	0x122
+ 278 011b 0D       		.uleb128 0xd
+ 279 011c 76000000 		.4byte	0x76
+ 280 0120 01       		.byte	0x1
+ 281 0121 00       		.byte	0
+ 282 0122 06       		.uleb128 0x6
+ 283 0123 2E000000 		.4byte	.LASF19
+ 284 0127 01       		.byte	0x1
+ 285 0128 17       		.byte	0x17
+ 286 0129 68000000 		.4byte	0x68
+ 287 012d 00000000 		.4byte	.LFB64
+ 288 0131 32000000 		.4byte	.LFE64-.LFB64
+ 289 0135 01       		.uleb128 0x1
+ 290 0136 9C       		.byte	0x9c
+ 291 0137 91010000 		.4byte	0x191
+ 292 013b 07       		.uleb128 0x7
+ 293 013c 5E010000 		.4byte	.LASF20
+ 294 0140 01       		.byte	0x1
+ 295 0141 17       		.byte	0x17
+ 296 0142 2C000000 		.4byte	0x2c
+ 297 0146 6B000000 		.4byte	.LLST3
+ 298 014a 08       		.uleb128 0x8
+ 299 014b 91010000 		.4byte	.LASF15
+ 300 014f 01       		.byte	0x1
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 7
+
+
+ 301 0150 19       		.byte	0x19
+ 302 0151 12010000 		.4byte	0x112
+ 303 0155 02       		.uleb128 0x2
+ 304 0156 91       		.byte	0x91
+ 305 0157 74       		.sleb128 -12
+ 306 0158 09       		.uleb128 0x9
+ 307 0159 8C010000 		.4byte	.LASF17
+ 308 015d 01       		.byte	0x1
+ 309 015e 1A       		.byte	0x1a
+ 310 015f 68000000 		.4byte	0x68
+ 311 0163 8C000000 		.4byte	.LLST4
+ 312 0167 09       		.uleb128 0x9
+ 313 0168 4E000000 		.4byte	.LASF16
+ 314 016c 01       		.byte	0x1
+ 315 016d 1B       		.byte	0x1b
+ 316 016e 68000000 		.4byte	0x68
+ 317 0172 B4000000 		.4byte	.LLST5
+ 318 0176 0A       		.uleb128 0xa
+ 319 0177 0E000000 		.4byte	.LVL9
+ 320 017b A2010000 		.4byte	0x1a2
+ 321 017f 0B       		.uleb128 0xb
+ 322 0180 01       		.uleb128 0x1
+ 323 0181 53       		.byte	0x53
+ 324 0182 01       		.uleb128 0x1
+ 325 0183 32       		.byte	0x32
+ 326 0184 0B       		.uleb128 0xb
+ 327 0185 01       		.uleb128 0x1
+ 328 0186 52       		.byte	0x52
+ 329 0187 02       		.uleb128 0x2
+ 330 0188 91       		.byte	0x91
+ 331 0189 74       		.sleb128 -12
+ 332 018a 0B       		.uleb128 0xb
+ 333 018b 01       		.uleb128 0x1
+ 334 018c 51       		.byte	0x51
+ 335 018d 01       		.uleb128 0x1
+ 336 018e 37       		.byte	0x37
+ 337 018f 00       		.byte	0
+ 338 0190 00       		.byte	0
+ 339 0191 0E       		.uleb128 0xe
+ 340 0192 73010000 		.4byte	.LASF24
+ 341 0196 04       		.byte	0x4
+ 342 0197 2A06     		.2byte	0x62a
+ 343 0199 9D010000 		.4byte	0x19d
+ 344 019d 0F       		.uleb128 0xf
+ 345 019e 8A000000 		.4byte	0x8a
+ 346 01a2 10       		.uleb128 0x10
+ 347 01a3 50010000 		.4byte	.LASF25
+ 348 01a7 05       		.byte	0x5
+ 349 01a8 08       		.byte	0x8
+ 350 01a9 2C000000 		.4byte	0x2c
+ 351 01ad 11       		.uleb128 0x11
+ 352 01ae 2C000000 		.4byte	0x2c
+ 353 01b2 11       		.uleb128 0x11
+ 354 01b3 2C000000 		.4byte	0x2c
+ 355 01b7 11       		.uleb128 0x11
+ 356 01b8 7D000000 		.4byte	0x7d
+ 357 01bc 11       		.uleb128 0x11
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 8
+
+
+ 358 01bd 2C000000 		.4byte	0x2c
+ 359 01c1 00       		.byte	0
+ 360 01c2 00       		.byte	0
+ 361              		.section	.debug_abbrev,"",%progbits
+ 362              	.Ldebug_abbrev0:
+ 363 0000 01       		.uleb128 0x1
+ 364 0001 11       		.uleb128 0x11
+ 365 0002 01       		.byte	0x1
+ 366 0003 25       		.uleb128 0x25
+ 367 0004 0E       		.uleb128 0xe
+ 368 0005 13       		.uleb128 0x13
+ 369 0006 0B       		.uleb128 0xb
+ 370 0007 03       		.uleb128 0x3
+ 371 0008 0E       		.uleb128 0xe
+ 372 0009 1B       		.uleb128 0x1b
+ 373 000a 0E       		.uleb128 0xe
+ 374 000b 55       		.uleb128 0x55
+ 375 000c 17       		.uleb128 0x17
+ 376 000d 11       		.uleb128 0x11
+ 377 000e 01       		.uleb128 0x1
+ 378 000f 10       		.uleb128 0x10
+ 379 0010 17       		.uleb128 0x17
+ 380 0011 00       		.byte	0
+ 381 0012 00       		.byte	0
+ 382 0013 02       		.uleb128 0x2
+ 383 0014 24       		.uleb128 0x24
+ 384 0015 00       		.byte	0
+ 385 0016 0B       		.uleb128 0xb
+ 386 0017 0B       		.uleb128 0xb
+ 387 0018 3E       		.uleb128 0x3e
+ 388 0019 0B       		.uleb128 0xb
+ 389 001a 03       		.uleb128 0x3
+ 390 001b 0E       		.uleb128 0xe
+ 391 001c 00       		.byte	0
+ 392 001d 00       		.byte	0
+ 393 001e 03       		.uleb128 0x3
+ 394 001f 16       		.uleb128 0x16
+ 395 0020 00       		.byte	0
+ 396 0021 03       		.uleb128 0x3
+ 397 0022 0E       		.uleb128 0xe
+ 398 0023 3A       		.uleb128 0x3a
+ 399 0024 0B       		.uleb128 0xb
+ 400 0025 3B       		.uleb128 0x3b
+ 401 0026 0B       		.uleb128 0xb
+ 402 0027 49       		.uleb128 0x49
+ 403 0028 13       		.uleb128 0x13
+ 404 0029 00       		.byte	0
+ 405 002a 00       		.byte	0
+ 406 002b 04       		.uleb128 0x4
+ 407 002c 24       		.uleb128 0x24
+ 408 002d 00       		.byte	0
+ 409 002e 0B       		.uleb128 0xb
+ 410 002f 0B       		.uleb128 0xb
+ 411 0030 3E       		.uleb128 0x3e
+ 412 0031 0B       		.uleb128 0xb
+ 413 0032 03       		.uleb128 0x3
+ 414 0033 08       		.uleb128 0x8
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 9
+
+
+ 415 0034 00       		.byte	0
+ 416 0035 00       		.byte	0
+ 417 0036 05       		.uleb128 0x5
+ 418 0037 0F       		.uleb128 0xf
+ 419 0038 00       		.byte	0
+ 420 0039 0B       		.uleb128 0xb
+ 421 003a 0B       		.uleb128 0xb
+ 422 003b 49       		.uleb128 0x49
+ 423 003c 13       		.uleb128 0x13
+ 424 003d 00       		.byte	0
+ 425 003e 00       		.byte	0
+ 426 003f 06       		.uleb128 0x6
+ 427 0040 2E       		.uleb128 0x2e
+ 428 0041 01       		.byte	0x1
+ 429 0042 3F       		.uleb128 0x3f
+ 430 0043 19       		.uleb128 0x19
+ 431 0044 03       		.uleb128 0x3
+ 432 0045 0E       		.uleb128 0xe
+ 433 0046 3A       		.uleb128 0x3a
+ 434 0047 0B       		.uleb128 0xb
+ 435 0048 3B       		.uleb128 0x3b
+ 436 0049 0B       		.uleb128 0xb
+ 437 004a 27       		.uleb128 0x27
+ 438 004b 19       		.uleb128 0x19
+ 439 004c 49       		.uleb128 0x49
+ 440 004d 13       		.uleb128 0x13
+ 441 004e 11       		.uleb128 0x11
+ 442 004f 01       		.uleb128 0x1
+ 443 0050 12       		.uleb128 0x12
+ 444 0051 06       		.uleb128 0x6
+ 445 0052 40       		.uleb128 0x40
+ 446 0053 18       		.uleb128 0x18
+ 447 0054 9742     		.uleb128 0x2117
+ 448 0056 19       		.uleb128 0x19
+ 449 0057 01       		.uleb128 0x1
+ 450 0058 13       		.uleb128 0x13
+ 451 0059 00       		.byte	0
+ 452 005a 00       		.byte	0
+ 453 005b 07       		.uleb128 0x7
+ 454 005c 05       		.uleb128 0x5
+ 455 005d 00       		.byte	0
+ 456 005e 03       		.uleb128 0x3
+ 457 005f 0E       		.uleb128 0xe
+ 458 0060 3A       		.uleb128 0x3a
+ 459 0061 0B       		.uleb128 0xb
+ 460 0062 3B       		.uleb128 0x3b
+ 461 0063 0B       		.uleb128 0xb
+ 462 0064 49       		.uleb128 0x49
+ 463 0065 13       		.uleb128 0x13
+ 464 0066 02       		.uleb128 0x2
+ 465 0067 17       		.uleb128 0x17
+ 466 0068 00       		.byte	0
+ 467 0069 00       		.byte	0
+ 468 006a 08       		.uleb128 0x8
+ 469 006b 34       		.uleb128 0x34
+ 470 006c 00       		.byte	0
+ 471 006d 03       		.uleb128 0x3
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 10
+
+
+ 472 006e 0E       		.uleb128 0xe
+ 473 006f 3A       		.uleb128 0x3a
+ 474 0070 0B       		.uleb128 0xb
+ 475 0071 3B       		.uleb128 0x3b
+ 476 0072 0B       		.uleb128 0xb
+ 477 0073 49       		.uleb128 0x49
+ 478 0074 13       		.uleb128 0x13
+ 479 0075 02       		.uleb128 0x2
+ 480 0076 18       		.uleb128 0x18
+ 481 0077 00       		.byte	0
+ 482 0078 00       		.byte	0
+ 483 0079 09       		.uleb128 0x9
+ 484 007a 34       		.uleb128 0x34
+ 485 007b 00       		.byte	0
+ 486 007c 03       		.uleb128 0x3
+ 487 007d 0E       		.uleb128 0xe
+ 488 007e 3A       		.uleb128 0x3a
+ 489 007f 0B       		.uleb128 0xb
+ 490 0080 3B       		.uleb128 0x3b
+ 491 0081 0B       		.uleb128 0xb
+ 492 0082 49       		.uleb128 0x49
+ 493 0083 13       		.uleb128 0x13
+ 494 0084 02       		.uleb128 0x2
+ 495 0085 17       		.uleb128 0x17
+ 496 0086 00       		.byte	0
+ 497 0087 00       		.byte	0
+ 498 0088 0A       		.uleb128 0xa
+ 499 0089 898201   		.uleb128 0x4109
+ 500 008c 01       		.byte	0x1
+ 501 008d 11       		.uleb128 0x11
+ 502 008e 01       		.uleb128 0x1
+ 503 008f 31       		.uleb128 0x31
+ 504 0090 13       		.uleb128 0x13
+ 505 0091 00       		.byte	0
+ 506 0092 00       		.byte	0
+ 507 0093 0B       		.uleb128 0xb
+ 508 0094 8A8201   		.uleb128 0x410a
+ 509 0097 00       		.byte	0
+ 510 0098 02       		.uleb128 0x2
+ 511 0099 18       		.uleb128 0x18
+ 512 009a 9142     		.uleb128 0x2111
+ 513 009c 18       		.uleb128 0x18
+ 514 009d 00       		.byte	0
+ 515 009e 00       		.byte	0
+ 516 009f 0C       		.uleb128 0xc
+ 517 00a0 01       		.uleb128 0x1
+ 518 00a1 01       		.byte	0x1
+ 519 00a2 49       		.uleb128 0x49
+ 520 00a3 13       		.uleb128 0x13
+ 521 00a4 01       		.uleb128 0x1
+ 522 00a5 13       		.uleb128 0x13
+ 523 00a6 00       		.byte	0
+ 524 00a7 00       		.byte	0
+ 525 00a8 0D       		.uleb128 0xd
+ 526 00a9 21       		.uleb128 0x21
+ 527 00aa 00       		.byte	0
+ 528 00ab 49       		.uleb128 0x49
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 11
+
+
+ 529 00ac 13       		.uleb128 0x13
+ 530 00ad 2F       		.uleb128 0x2f
+ 531 00ae 0B       		.uleb128 0xb
+ 532 00af 00       		.byte	0
+ 533 00b0 00       		.byte	0
+ 534 00b1 0E       		.uleb128 0xe
+ 535 00b2 34       		.uleb128 0x34
+ 536 00b3 00       		.byte	0
+ 537 00b4 03       		.uleb128 0x3
+ 538 00b5 0E       		.uleb128 0xe
+ 539 00b6 3A       		.uleb128 0x3a
+ 540 00b7 0B       		.uleb128 0xb
+ 541 00b8 3B       		.uleb128 0x3b
+ 542 00b9 05       		.uleb128 0x5
+ 543 00ba 49       		.uleb128 0x49
+ 544 00bb 13       		.uleb128 0x13
+ 545 00bc 3F       		.uleb128 0x3f
+ 546 00bd 19       		.uleb128 0x19
+ 547 00be 3C       		.uleb128 0x3c
+ 548 00bf 19       		.uleb128 0x19
+ 549 00c0 00       		.byte	0
+ 550 00c1 00       		.byte	0
+ 551 00c2 0F       		.uleb128 0xf
+ 552 00c3 35       		.uleb128 0x35
+ 553 00c4 00       		.byte	0
+ 554 00c5 49       		.uleb128 0x49
+ 555 00c6 13       		.uleb128 0x13
+ 556 00c7 00       		.byte	0
+ 557 00c8 00       		.byte	0
+ 558 00c9 10       		.uleb128 0x10
+ 559 00ca 2E       		.uleb128 0x2e
+ 560 00cb 01       		.byte	0x1
+ 561 00cc 3F       		.uleb128 0x3f
+ 562 00cd 19       		.uleb128 0x19
+ 563 00ce 03       		.uleb128 0x3
+ 564 00cf 0E       		.uleb128 0xe
+ 565 00d0 3A       		.uleb128 0x3a
+ 566 00d1 0B       		.uleb128 0xb
+ 567 00d2 3B       		.uleb128 0x3b
+ 568 00d3 0B       		.uleb128 0xb
+ 569 00d4 27       		.uleb128 0x27
+ 570 00d5 19       		.uleb128 0x19
+ 571 00d6 49       		.uleb128 0x49
+ 572 00d7 13       		.uleb128 0x13
+ 573 00d8 3C       		.uleb128 0x3c
+ 574 00d9 19       		.uleb128 0x19
+ 575 00da 00       		.byte	0
+ 576 00db 00       		.byte	0
+ 577 00dc 11       		.uleb128 0x11
+ 578 00dd 05       		.uleb128 0x5
+ 579 00de 00       		.byte	0
+ 580 00df 49       		.uleb128 0x49
+ 581 00e0 13       		.uleb128 0x13
+ 582 00e1 00       		.byte	0
+ 583 00e2 00       		.byte	0
+ 584 00e3 00       		.byte	0
+ 585              		.section	.debug_loc,"",%progbits
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 12
+
+
+ 586              	.Ldebug_loc0:
+ 587              	.LLST0:
+ 588 0000 00000000 		.4byte	.LVL0
+ 589 0004 0D000000 		.4byte	.LVL1-1
+ 590 0008 0100     		.2byte	0x1
+ 591 000a 50       		.byte	0x50
+ 592 000b 0D000000 		.4byte	.LVL1-1
+ 593 000f 32000000 		.4byte	.LFE63
+ 594 0013 0400     		.2byte	0x4
+ 595 0015 F3       		.byte	0xf3
+ 596 0016 01       		.uleb128 0x1
+ 597 0017 50       		.byte	0x50
+ 598 0018 9F       		.byte	0x9f
+ 599 0019 00000000 		.4byte	0
+ 600 001d 00000000 		.4byte	0
+ 601              	.LLST1:
+ 602 0021 20000000 		.4byte	.LVL3
+ 603 0025 24000000 		.4byte	.LVL4
+ 604 0029 0100     		.2byte	0x1
+ 605 002b 50       		.byte	0x50
+ 606 002c 24000000 		.4byte	.LVL4
+ 607 0030 26000000 		.4byte	.LVL5
+ 608 0034 0500     		.2byte	0x5
+ 609 0036 70       		.byte	0x70
+ 610 0037 80D501   		.sleb128 27264
+ 611 003a 9F       		.byte	0x9f
+ 612 003b 00000000 		.4byte	0
+ 613 003f 00000000 		.4byte	0
+ 614              	.LLST2:
+ 615 0043 0E000000 		.4byte	.LVL1
+ 616 0047 16000000 		.4byte	.LVL2
+ 617 004b 0600     		.2byte	0x6
+ 618 004d 70       		.byte	0x70
+ 619 004e 00       		.sleb128 0
+ 620 004f 08       		.byte	0x8
+ 621 0050 FF       		.byte	0xff
+ 622 0051 1A       		.byte	0x1a
+ 623 0052 9F       		.byte	0x9f
+ 624 0053 28000000 		.4byte	.LVL6
+ 625 0057 2C000000 		.4byte	.LVL7
+ 626 005b 0600     		.2byte	0x6
+ 627 005d 70       		.byte	0x70
+ 628 005e 00       		.sleb128 0
+ 629 005f 08       		.byte	0x8
+ 630 0060 FF       		.byte	0xff
+ 631 0061 1A       		.byte	0x1a
+ 632 0062 9F       		.byte	0x9f
+ 633 0063 00000000 		.4byte	0
+ 634 0067 00000000 		.4byte	0
+ 635              	.LLST3:
+ 636 006b 00000000 		.4byte	.LVL8
+ 637 006f 0D000000 		.4byte	.LVL9-1
+ 638 0073 0100     		.2byte	0x1
+ 639 0075 50       		.byte	0x50
+ 640 0076 0D000000 		.4byte	.LVL9-1
+ 641 007a 32000000 		.4byte	.LFE64
+ 642 007e 0400     		.2byte	0x4
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 13
+
+
+ 643 0080 F3       		.byte	0xf3
+ 644 0081 01       		.uleb128 0x1
+ 645 0082 50       		.byte	0x50
+ 646 0083 9F       		.byte	0x9f
+ 647 0084 00000000 		.4byte	0
+ 648 0088 00000000 		.4byte	0
+ 649              	.LLST4:
+ 650 008c 0E000000 		.4byte	.LVL9
+ 651 0090 16000000 		.4byte	.LVL10
+ 652 0094 0600     		.2byte	0x6
+ 653 0096 70       		.byte	0x70
+ 654 0097 00       		.sleb128 0
+ 655 0098 08       		.byte	0x8
+ 656 0099 FF       		.byte	0xff
+ 657 009a 1A       		.byte	0x1a
+ 658 009b 9F       		.byte	0x9f
+ 659 009c 28000000 		.4byte	.LVL14
+ 660 00a0 2C000000 		.4byte	.LVL15
+ 661 00a4 0600     		.2byte	0x6
+ 662 00a6 70       		.byte	0x70
+ 663 00a7 00       		.sleb128 0
+ 664 00a8 08       		.byte	0x8
+ 665 00a9 FF       		.byte	0xff
+ 666 00aa 1A       		.byte	0x1a
+ 667 00ab 9F       		.byte	0x9f
+ 668 00ac 00000000 		.4byte	0
+ 669 00b0 00000000 		.4byte	0
+ 670              	.LLST5:
+ 671 00b4 20000000 		.4byte	.LVL11
+ 672 00b8 24000000 		.4byte	.LVL12
+ 673 00bc 0100     		.2byte	0x1
+ 674 00be 50       		.byte	0x50
+ 675 00bf 24000000 		.4byte	.LVL12
+ 676 00c3 26000000 		.4byte	.LVL13
+ 677 00c7 0500     		.2byte	0x5
+ 678 00c9 70       		.byte	0x70
+ 679 00ca 80D501   		.sleb128 27264
+ 680 00cd 9F       		.byte	0x9f
+ 681 00ce 00000000 		.4byte	0
+ 682 00d2 00000000 		.4byte	0
+ 683              		.section	.debug_aranges,"",%progbits
+ 684 0000 24000000 		.4byte	0x24
+ 685 0004 0200     		.2byte	0x2
+ 686 0006 00000000 		.4byte	.Ldebug_info0
+ 687 000a 04       		.byte	0x4
+ 688 000b 00       		.byte	0
+ 689 000c 0000     		.2byte	0
+ 690 000e 0000     		.2byte	0
+ 691 0010 00000000 		.4byte	.LFB63
+ 692 0014 32000000 		.4byte	.LFE63-.LFB63
+ 693 0018 00000000 		.4byte	.LFB64
+ 694 001c 32000000 		.4byte	.LFE64-.LFB64
+ 695 0020 00000000 		.4byte	0
+ 696 0024 00000000 		.4byte	0
+ 697              		.section	.debug_ranges,"",%progbits
+ 698              	.Ldebug_ranges0:
+ 699 0000 00000000 		.4byte	.LFB63
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 14
+
+
+ 700 0004 32000000 		.4byte	.LFE63
+ 701 0008 00000000 		.4byte	.LFB64
+ 702 000c 32000000 		.4byte	.LFE64
+ 703 0010 00000000 		.4byte	0
+ 704 0014 00000000 		.4byte	0
+ 705              		.section	.debug_line,"",%progbits
+ 706              	.Ldebug_line0:
+ 707 0000 80010000 		.section	.debug_str,"MS",%progbits,1
+ 707      02005001 
+ 707      00000201 
+ 707      FB0E0D00 
+ 707      01010101 
+ 708              	.LASF6:
+ 709 0000 6C6F6E67 		.ascii	"long long int\000"
+ 709      206C6F6E 
+ 709      6720696E 
+ 709      7400
+ 710              	.LASF3:
+ 711 000e 73686F72 		.ascii	"short unsigned int\000"
+ 711      7420756E 
+ 711      7369676E 
+ 711      65642069 
+ 711      6E7400
+ 712              	.LASF8:
+ 713 0021 756E7369 		.ascii	"unsigned int\000"
+ 713      676E6564 
+ 713      20696E74 
+ 713      00
+ 714              	.LASF19:
+ 715 002e 6D6C7839 		.ascii	"mlx90614_read_out\000"
+ 715      30363134 
+ 715      5F726561 
+ 715      645F6F75 
+ 715      7400
+ 716              	.LASF1:
+ 717 0040 756E7369 		.ascii	"unsigned char\000"
+ 717      676E6564 
+ 717      20636861 
+ 717      7200
+ 718              	.LASF16:
+ 719 004e 74656D70 		.ascii	"temp\000"
+ 719      00
+ 720              	.LASF12:
+ 721 0053 696E7433 		.ascii	"int32_t\000"
+ 721      325F7400 
+ 722              	.LASF5:
+ 723 005b 6C6F6E67 		.ascii	"long unsigned int\000"
+ 723      20756E73 
+ 723      69676E65 
+ 723      6420696E 
+ 723      7400
+ 724              	.LASF7:
+ 725 006d 6C6F6E67 		.ascii	"long long unsigned int\000"
+ 725      206C6F6E 
+ 725      6720756E 
+ 725      7369676E 
+ 725      65642069 
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 15
+
+
+ 726              	.LASF22:
+ 727 0084 2E5C4D4C 		.ascii	".\\MLX90614.c\000"
+ 727      58393036 
+ 727      31342E63 
+ 727      00
+ 728              	.LASF21:
+ 729 0091 474E5520 		.ascii	"GNU C 4.9.3 20150303 (release) [ARM/embedded-4_9-br"
+ 729      4320342E 
+ 729      392E3320 
+ 729      32303135 
+ 729      30333033 
+ 730 00c4 616E6368 		.ascii	"anch revision 221220] -mcpu=cortex-m3 -mthumb -g -O"
+ 730      20726576 
+ 730      6973696F 
+ 730      6E203232 
+ 730      31323230 
+ 731 00f7 67202D66 		.ascii	"g -ffunction-sections -ffat-lto-objects\000"
+ 731      66756E63 
+ 731      74696F6E 
+ 731      2D736563 
+ 731      74696F6E 
+ 732              	.LASF23:
+ 733 011f 443A5C72 		.ascii	"D:\\robot\\code\\robot_T\\Workspace01\\T_senser.cyd"
+ 733      6F626F74 
+ 733      5C636F64 
+ 733      655C726F 
+ 733      626F745F 
+ 734 014d 736E00   		.ascii	"sn\000"
+ 735              	.LASF25:
+ 736 0150 4932435F 		.ascii	"I2C_Read\000"
+ 736      52656164 
+ 736      00
+ 737              	.LASF10:
+ 738 0159 63686172 		.ascii	"char\000"
+ 738      00
+ 739              	.LASF20:
+ 740 015e 61646472 		.ascii	"addr\000"
+ 740      00
+ 741              	.LASF4:
+ 742 0163 6C6F6E67 		.ascii	"long int\000"
+ 742      20696E74 
+ 742      00
+ 743              	.LASF14:
+ 744 016c 646F7562 		.ascii	"double\000"
+ 744      6C6500
+ 745              	.LASF24:
+ 746 0173 49544D5F 		.ascii	"ITM_RxBuffer\000"
+ 746      52784275 
+ 746      66666572 
+ 746      00
+ 747              	.LASF0:
+ 748 0180 7369676E 		.ascii	"signed char\000"
+ 748      65642063 
+ 748      68617200 
+ 749              	.LASF17:
+ 750 018c 73697A65 		.ascii	"size\000"
+ 750      00
+ARM GAS  C:\Users\pxc\AppData\Local\Temp\ccoog7Og.s 			page 16
+
+
+ 751              	.LASF15:
+ 752 0191 49324344 		.ascii	"I2CData\000"
+ 752      61746100 
+ 753              	.LASF11:
+ 754 0199 5F5F696E 		.ascii	"__int32_t\000"
+ 754      7433325F 
+ 754      7400
+ 755              	.LASF13:
+ 756 01a3 666C6F61 		.ascii	"float\000"
+ 756      7400
+ 757              	.LASF2:
+ 758 01a9 73686F72 		.ascii	"short int\000"
+ 758      7420696E 
+ 758      7400
+ 759              	.LASF18:
+ 760 01b3 6D6C7839 		.ascii	"mlx90614_read_in\000"
+ 760      30363134 
+ 760      5F726561 
+ 760      645F696E 
+ 760      00
+ 761              	.LASF9:
+ 762 01c4 73697A65 		.ascii	"sizetype\000"
+ 762      74797065 
+ 762      00
+ 763              		.ident	"GCC: (GNU Tools for ARM Embedded Processors) 4.9.3 20150303 (release) [ARM/embedded-4_9-br
